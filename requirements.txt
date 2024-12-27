@@ -1,0 +1,6 @@
+# Package dependencies
+pandas
+numpy
+pyyaml
+jupyter
+scikit-learn
