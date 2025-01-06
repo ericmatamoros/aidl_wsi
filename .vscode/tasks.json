@@ -1,0 +1,41 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "1.0.0",
+    "tasks": [
+        {
+            "label": "convert_to_png",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "python",
+                "-m", "mil_wsi.scripts.convert_to_png",
+                "--source", "./mil_wsi/data",
+                "--save_dir", "./mil_wsi/data/images/",
+                "--file_extension", "svs"
+
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "create_patches",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "python",
+                "-m", "mil_wsi.scripts.create_patches",
+                "--source", "./mil_wsi/data",
+                "--save_dir", "./mil_wsi/data/results/",
+                "--patch_size", "256",
+                "--patch",
+                "--stitch"
+
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

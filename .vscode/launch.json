@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "convert_to_png",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.convert_to_png",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2"
+            },
+            "args": [
+                "--source", "./mil_wsi/data",
+                "--save_dir", "./mil_wsi/data/images/",
+                "--file_extension", "svs"
+            ]
+        },
+        {
+            "name": "create_patches",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.create_patches",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2"
+            },
+            "args": [
+                "--source", "./mil_wsi/data",
+                "--save_dir", "./mil_wsi/data/results/",
+                "--patch_size", "256",
+                "--patch",
+                "--stitch"
+            ]
+        }
+    ]
+}
