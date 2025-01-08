@@ -1,0 +1,4 @@
+# Files to avoid being committed
+*.svs
+*.pyc
+*.png
