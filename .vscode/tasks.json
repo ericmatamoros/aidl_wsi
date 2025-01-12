@@ -56,6 +56,16 @@
                 "--slide_ext", ".svs"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "pipeline",
+            "type": "shell",
+            "dependsOn": [
+                "create_patches",
+                "extract_features"
+            ],
+            "problemMatcher": []
         }
+        
     ]
 }
