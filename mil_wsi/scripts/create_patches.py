@@ -7,6 +7,9 @@ import numpy as np
 import time
 import argparse
 import pdb
+import h5py
+import cv2
+from openslide import OpenSlide
 import pandas as pd
 from tqdm import tqdm
 
@@ -44,7 +47,43 @@ def patching(WSI_object, **kwargs):
 	return file_path, patch_time_elapsed
 
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+def get_wsi_dimensions(wsi_path):
+    """Gets the dimensions of the original WSI."""
+    slide = OpenSlide(wsi_path)
+    return slide.dimensions  # Returns (width, height)
+
+def get_target_dimensions(target_path):
+    """Gets the dimensions of the visualization file (masks or stitches)."""
+    target_image = cv2.imread(target_path)
+    if target_image is None:
+        raise FileNotFoundError(f"Target file not found: {target_path}")
+    return target_image.shape[1], target_image.shape[0]  # Returns (width, height)
+
+def draw_patches_on_target(target_path, coords, output_path, scale_x, scale_y, patch_size):
+    """Draws rectangles on the visualization file (masks or stitches)."""
+    # Load the visualization file
+    target_image = cv2.imread(target_path)
+    if target_image is None:
+        print(f"Error loading target: {target_path}")
+        return
+    
+    # Adjust the coordinates and patch size
+    adjusted_patch_size_x = int(patch_size * scale_x)
+    adjusted_patch_size_y = int(patch_size * scale_y)
+
+    # Draw a rectangle for each adjusted coordinate
+    for x, y in coords:
+        top_left = (int(x * scale_x), int(y * scale_y))
+        bottom_right = (int((x * scale_x) + adjusted_patch_size_x), int((y * scale_y) + adjusted_patch_size_y))
+        color = (0, 255, 255) 
+        thickness = 1
+        cv2.rectangle(target_image, top_left, bottom_right, color, thickness)
+    
+    # Save the image with the rectangles
+    cv2.imwrite(output_path, target_image)
+
+
+def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, mask_on_patch_save_dir,
 				  patch_size = 256, step_size = 256, 
 				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
 				  'keep_ids': 'none', 'exclude_ids': 'none'},
@@ -55,12 +94,16 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				  use_default_params = False, 
 				  seg = False, save_mask = True, 
 				  stitch= False, 
-				  patch = False, auto_skip=True, process_list = None):
+				  patch = False, 
+				  patch_on_mask = False,
+				  auto_skip=True, process_list = None):
 	
 
 
 	slides = sorted(os.listdir(source))
 	slides = [slide for slide in slides if os.path.isfile(os.path.join(source, slide))]
+	slides = [slide for slide in slides if  'git' not in slide]
+	slides = [slide for slide in slides if  'csv' not in slide]
 	if process_list is None:
 		df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params)
 	
@@ -206,6 +249,24 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				stitch_path = os.path.join(stitch_save_dir, slide_id+'.jpg')
 				heatmap.save(stitch_path)
 
+		if patch_on_mask:
+			# Automatically get dimensions (px)
+			WSI_WIDTH, WSI_HEIGHT = get_wsi_dimensions(full_path)
+			TARGET_WIDTH, TARGET_HEIGHT = get_target_dimensions(os.path.join(mask_save_dir, slide_id+'.jpg'))
+
+			# Calculate scaling factors
+			SCALE_X = TARGET_WIDTH / WSI_WIDTH
+			SCALE_Y = TARGET_HEIGHT / WSI_HEIGHT
+
+			with h5py.File( os.path.join(patch_save_dir, slide_id+'.h5'), 'r') as f:
+				coords = f['coords'][:]
+			
+			draw_patches_on_target(
+				os.path.join(mask_save_dir, slide_id+'.jpg'), 
+				coords, 
+				os.path.join(mask_on_patch_save_dir, slide_id+'.jpg'), SCALE_X, SCALE_Y, patch_size)
+						
+
 		print("segmentation took {} seconds".format(seg_time_elapsed))
 		print("patching took {} seconds".format(patch_time_elapsed))
 		print("stitching took {} seconds".format(stitch_time_elapsed))
@@ -233,9 +294,10 @@ parser.add_argument('--step_size', type = int, default=256,
 					help='step_size')
 parser.add_argument('--patch_size', type = int, default=256,
 					help='patch_size')
-parser.add_argument('--patch', default=False, action='store_true')
+parser.add_argument('--patch', default=False, action = 'store_true', help='store H5 with the coordinates of the patches for a WSI')
 parser.add_argument('--seg', default=False, action='store_true')
-parser.add_argument('--stitch', default=False, action='store_true')
+parser.add_argument('--stitch', default=False,  action='store_true', help='store filtered WSI post-masking')
+parser.add_argument('--patch_on_mask', default=False,action='store_true', help='store WSI image with overlapping patches')
 parser.add_argument('--no_auto_skip', default=True, action='store_false')
 parser.add_argument('--save_dir', type = str,
 					help='directory to save processed data')
@@ -252,6 +314,7 @@ if __name__ == '__main__':
 	patch_save_dir = os.path.join(args.save_dir, 'patches')
 	mask_save_dir = os.path.join(args.save_dir, 'masks')
 	stitch_save_dir = os.path.join(args.save_dir, 'stitches')
+	mask_on_patch_save_dir = os.path.join(args.save_dir, 'patches_on_mask')
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
@@ -263,12 +326,14 @@ if __name__ == '__main__':
 	print('patch_save_dir: ', patch_save_dir)
 	print('mask_save_dir: ', mask_save_dir)
 	print('stitch_save_dir: ', stitch_save_dir)
+	print('mask_on_patch: ', mask_on_patch_save_dir)
 	
 	directories = {'source': args.source, 
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
-				   'stitch_save_dir': stitch_save_dir} 
+				   'stitch_save_dir': stitch_save_dir,
+				   'mask_on_patch_save_dir': mask_on_patch_save_dir} 
 
 	for key, val in directories.items():
 		print("{} : {}".format(key, val))
@@ -307,4 +372,6 @@ if __name__ == '__main__':
 											seg = args.seg,  use_default_params=False, save_mask = True, 
 											stitch= args.stitch,
 											patch_level=args.patch_level, patch = args.patch,
-											process_list = process_list, auto_skip=args.no_auto_skip)
+											patch_on_mask = args.patch_on_mask,
+											process_list = process_list, 
+											auto_skip=args.no_auto_skip)

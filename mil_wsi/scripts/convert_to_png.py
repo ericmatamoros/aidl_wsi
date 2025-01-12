@@ -15,22 +15,29 @@ def convert_to_png(source: str, save_dir: str, custom_image: str, file_extension
     files = [f for f in os.listdir(source) if os.path.isfile(os.path.join(source, f))]
     files = [x for x in files if file_extension.lower() in x.lower()]
 
-    if file_extension.lower() == 'svs':
-        print(f"Conversion from SVS to PNG")
-        if len(custom_image) != 0:
-            if not custom_image.endswith(f".{file_extension}"):
-                custom_image += f".{file_extension}"
-            files = [os.path.join(source, custom_image)]
-        else:
-            files = [os.path.join(source, f) for f in files]
+    # Standardize custom_image input if provided
+    if len(custom_image) != 0:
+        if not custom_image.endswith(f".{file_extension}"):
+            custom_image += f".{file_extension}"
+        files = [os.path.join(source, custom_image)]
+    else:
+        files = [os.path.join(source, f) for f in files]
+
+    # Check file extension and process accordingly
+    if file_extension.lower() in ['svs', 'ndpi', 'tiff']:
+        print(f"Conversion from {file_extension.upper()} to PNG")
 
         for file in files:
             print(f"Processing file: {file}")
-            filename = os.path.basename(file).split(".svs")[0]
-            slide = openslide.OpenSlide(file)
-
-            thumbnail = slide.get_thumbnail((1024, 1024))  # Resize thumbnail to 1024x1024
-            thumbnail.save(f"{save_dir}/{filename}.png", format="PNG")
+            filename = os.path.basename(file).split(f".{file_extension}")[0]
+            
+            try:
+                slide = openslide.OpenSlide(file)
+                thumbnail = slide.get_thumbnail((1024, 1024))  # Resize thumbnail to 1024x1024
+                thumbnail.save(f"{save_dir}/{filename}.png", format="PNG")
+                print(f"Saved: {save_dir}/{filename}.png")
+            except Exception as e:
+                print(f"Error processing file {file}: {e}")
     else:
         raise Exception(f"Currently we do not support the {file_extension} conversion to PNG")
 
