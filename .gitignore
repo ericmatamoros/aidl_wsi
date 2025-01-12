@@ -2,3 +2,8 @@
 *.svs
 *.pyc
 *.png
+
+
+# Folders to omit to upload
+*results/
+*data/
