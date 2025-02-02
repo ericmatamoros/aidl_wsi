@@ -2,7 +2,9 @@
 *.svs
 *.pyc
 *.png
-
+*.json
+*.csv
+*.pth
 
 # Folders to omit to upload
 *results/

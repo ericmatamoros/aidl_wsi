@@ -34,6 +34,45 @@
                 "--patch",
                 "--stitch"
             ]
+        },
+        {
+            "name": "extract_features",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.extract_features",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
+                "--data_h5_dir", "./mil_wsi/results/",
+                "--data_slide_dir", "./mil_wsi/data/",
+                "--csv_path", "./mil_wsi/results/process_list_autogen.csv",
+                "--feat_dir", "./mil_wsi/results/",
+                "--batch_size", "512",
+                "--slide_ext", ".svs"
+            ]
+        },
+        {
+            "name": "mlp_model",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.mlp_model",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_mlp"
+            ]
         }
     ]
 }

@@ -58,11 +58,30 @@
             "problemMatcher": []
         },
         {
+            "label": "mlp_model",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "CUDA_VISIBLE_DEVICES=0",
+                "python",
+                "-m", "mil_wsi.scripts.mlp_model",
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_mlp"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "pipeline",
             "type": "shell",
             "dependsOn": [
                 "create_patches",
-                "extract_features"
+                "extract_features",
+                "mlp_model"
             ],
             "problemMatcher": []
         }
