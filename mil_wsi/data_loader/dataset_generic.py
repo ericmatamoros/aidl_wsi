@@ -166,3 +166,5 @@ class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 
 			features = torch.from_numpy(features)
 			return features, label, coords, slide_id
+		
+		

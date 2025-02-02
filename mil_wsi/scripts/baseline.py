@@ -32,3 +32,5 @@ print("1rst train image:")
 print(train_dataset[0])
 print("2nd train image:")
 print(train_dataset[1])
+
+
