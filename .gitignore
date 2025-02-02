@@ -7,3 +7,4 @@
 # Folders to omit to upload
 *results/
 *data/
+mil_wsi/CLAM/models/UNI/pytorch_model.bin
