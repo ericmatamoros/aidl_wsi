@@ -44,7 +44,8 @@
             "subProcess": true,
             "env": {
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "0",
+                "UNI_CKPT_PATH": "./mil_wsi/UNI/pytorch_model.bin"
             },
             "args": [
                 "--data_h5_dir", "./mil_wsi/results/",
