@@ -15,6 +15,10 @@ from tqdm import tqdm
 
 import numpy as np
 
+import torch.multiprocessing as mp
+mp.set_start_method('spawn', force=True)
+
+
 from mil_wsi.CLAM  import (save_hdf5, Dataset_All_Bags, Whole_Slide_Bag_FP, get_encoder)
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -53,7 +57,7 @@ parser.add_argument('--slide_ext', type=str, default= '.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
 parser.add_argument('--model_name', type=str, default='resnet50_trunc', choices=['resnet50_trunc', 'uni_v1', 'conch_v1'])
-parser.add_argument('--batch_size', type=int, default=256)
+parser.add_argument('--batch_size', type=int, default=512)
 parser.add_argument('--no_auto_skip', default=False, action='store_true')
 parser.add_argument('--target_patch_size', type=int, default=224)
 args = parser.parse_args()
@@ -78,7 +82,7 @@ if __name__ == '__main__':
 	model = model.to(device)
 	total = len(bags_dataset)
 
-	loader_kwargs = {'num_workers': 8, 'pin_memory': True} if device.type == "cuda" else {}
+	loader_kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == "cuda" else {}
 
 	for bag_candidate_idx in tqdm(range(total)):
 		slide_id = bags_dataset[bag_candidate_idx].split(args.slide_ext)[0]

@@ -45,13 +45,13 @@
             "args": [
                 "run",
                 "-n", "wsi",
-                "CUDA_VISIBLE_DEVICES=0",
                 "python",
                 "-m", "mil_wsi.scripts.extract_features",
                 "--data_h5_dir", "./mil_wsi/results/",
                 "--data_slide_dir", "./mil_wsi/data/",
                 "--csv_path", "./mil_wsi/results/process_list_autogen.csv",
                 "--feat_dir", "./mil_wsi/results/",
+                "--model_name", "resnet50_trunc",
                 "--batch_size", "512",
                 "--slide_ext", ".svs"
             ],
