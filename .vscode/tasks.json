@@ -34,7 +34,6 @@
                 "--seg",
                 "--patch",
                 "--stitch",
-                "--patch_on_mask"
             ],
             "problemMatcher": []
         },
@@ -55,6 +54,11 @@
                 "--batch_size", "512",
                 "--slide_ext", ".svs"
             ],
+            "options": {
+                "env": {
+                    "UNI_CKPT_PATH": "./mil_wsi/UNI/pytorch_model.bin"
+                }
+            },
             "problemMatcher": []
         },
         {
@@ -83,6 +87,7 @@
                 "extract_features",
                 "mlp_model"
             ],
+            "dependsOrder": "sequence",
             "problemMatcher": []
         }
         
