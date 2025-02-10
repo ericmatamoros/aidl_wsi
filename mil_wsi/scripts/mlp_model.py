@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
 from mil_wsi.interfaces import (
@@ -64,9 +65,9 @@ parser.add_argument('--batch_size', type=int, default=32,
                     help='size of the batch')
 parser.add_argument('--hidden_size', type=float, default=128,
                     help='hidden size of the MLP network')
-parser.add_argument('--epochs', type=int, default=3,
+parser.add_argument('--epochs', type=int, default=10,
                     help='number of epochs to train')
-parser.add_argument('--test_size', type=float, default=0.2,
+parser.add_argument('--test_size', type=float, default=0.3,
                     help='test size')
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -102,14 +103,23 @@ if __name__ == '__main__':
     target = df['target']
 
     # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_train, X_temp, y_train, y_temp = train_test_split(
         features, target, test_size=args.test_size, random_state=4, stratify=target
     )
 
+    # Balance the training data using SMOTE
+    smote = SMOTE(random_state=42)
+    X_train, y_train = smote.fit_resample(X_train, y_train)
+
+    # Then, split the temporary set into evaluation and test sets (keeping their natural imbalance)
+    X_eval, X_test, y_eval, y_test = train_test_split(
+        X_temp, y_temp, test_size=0.5, random_state=4, stratify=y_temp
+    )
 
     # Create Dataset objects for training and testing
     train_dataset = MLPDataset(X_train, y_train)
     test_dataset = MLPDataset(X_test, y_test)
+    val_dataset = MLPDataset(X_eval, y_eval)
 
     # Create DataLoader objects for batching
     batch_size = args.batch_size
@@ -117,8 +127,9 @@ if __name__ == '__main__':
     n_epochs = args.epochs
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    #MLP Loader
+    #MLP Loader    
     model = MLP(input_size=input_size, hidden_size=hidden_size, output_size=1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -130,7 +141,7 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=0.001)
 
         # Train the MLP model
-        model = train_mlp(model, train_loader, criterion, optimizer, device, n_epochs)
+        model = train_mlp(model, train_loader, val_loader, criterion, optimizer, device, n_epochs)
 
         # Store model state
         torch.save(model.state_dict(), f"{model_path}{model_name}.pth")
