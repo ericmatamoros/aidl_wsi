@@ -18,7 +18,7 @@ class MLP(nn.Module):
     def forward(self, x):
             # Propagación hacia adelante
             x = self.relu(self.fc1(x))  # Aplicamos ReLU después de la primera capa
-            x = self.sigmoid(self.fc2(x))  # Salida de la segunda capa
+            x = self.fc2(x)  # Salida de la segunda capa
             return x
     
 

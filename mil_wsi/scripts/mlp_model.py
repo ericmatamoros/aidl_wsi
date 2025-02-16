@@ -65,7 +65,7 @@ parser.add_argument('--batch_size', type=int, default=32,
                     help='size of the batch')
 parser.add_argument('--hidden_size', type=float, default=128,
                     help='hidden size of the MLP network')
-parser.add_argument('--epochs', type=int, default=10,
+parser.add_argument('--epochs', type=int, default=5,
                     help='number of epochs to train')
 parser.add_argument('--test_size', type=float, default=0.3,
                     help='test size')
