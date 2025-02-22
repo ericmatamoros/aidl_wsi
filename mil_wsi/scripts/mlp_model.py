@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
 from mil_wsi.interfaces import (
@@ -106,10 +105,6 @@ if __name__ == '__main__':
     X_train, X_temp, y_train, y_temp = train_test_split(
         features, target, test_size=args.test_size, random_state=4, stratify=target
     )
-
-    # Balance the training data using SMOTE
-    smote = SMOTE(random_state=42)
-    X_train, y_train = smote.fit_resample(X_train, y_train)
 
     # Then, split the temporary set into evaluation and test sets (keeping their natural imbalance)
     X_eval, X_test, y_eval, y_test = train_test_split(

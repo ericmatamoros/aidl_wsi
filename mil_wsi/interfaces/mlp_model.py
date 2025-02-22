@@ -2,6 +2,35 @@
 from loguru import logger
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0, reduction='mean'):
+        """
+        Focal Loss for binary classification.
+        alpha: Balancing factor for positive and negative classes.
+        gamma: Focusing parameter.
+        reduction: 'mean' or 'sum' (default is 'mean').
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, logits, targets):
+        """
+        logits: Model outputs (before sigmoid).
+        targets: Ground-truth labels (0 or 1).
+        """
+        probs = torch.sigmoid(logits)  # Convert logits to probabilities
+        probs = torch.clamp(probs, min=1e-6, max=1-1e-6)  # Prevent log(0) errors
+        
+        # Compute focal loss components
+        focal_weight = self.alpha * (1 - probs) ** self.gamma * targets + (1 - self.alpha) * probs ** self.gamma * (1 - targets)
+        loss = -focal_weight * (targets * torch.log(probs) + (1 - targets) * torch.log(1 - probs))
+
+        return loss.mean() if self.reduction == 'mean' else loss.sum()
+
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -22,18 +51,42 @@ class MLP(nn.Module):
             return x
     
 
-def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, penalty_coefficient=0.1):
+def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, use_focal_loss=True):
+    """
+    Train an MLP model using either standard loss or Focal Loss.
+
+    Arguments:
+    model: PyTorch MLP model
+    train_loader: DataLoader for training
+    val_loader: DataLoader for validation
+    criterion: Loss function (e.g., BCEWithLogitsLoss or FocalLoss)
+    optimizer: PyTorch optimizer
+    device: CUDA or CPU device
+    epochs: Number of training epochs
+    use_focal_loss: Whether to use Focal Loss for training
+    
+    Returns:
+    Trained model
+    """
+    focal_loss = FocalLoss() if use_focal_loss else None
+
     for epoch in range(epochs):
         # Training phase
-        model.train()  # set model to training mode
+        model.train()
         running_loss = 0.0
+
         for inputs, labels in train_loader:
             inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
             outputs = model(inputs)
-            # Use the penalized loss during training
-            loss = penalized_loss_binary(outputs, labels, criterion, penalty_coefficient=penalty_coefficient)
+
+            # Apply focal loss if specified
+            if use_focal_loss:
+                loss = focal_loss(outputs.squeeze(), labels.float())
+            else:
+                loss = criterion(outputs.squeeze(), labels.float())
+
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -41,13 +94,14 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
         avg_train_loss = running_loss / len(train_loader)
 
         # Evaluation phase
-        model.eval()  # set model to evaluation mode
+        model.eval()
         val_loss = 0.0
-        with torch.no_grad():  # disable gradient computation
+
+        with torch.no_grad():
             for inputs, labels in val_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model(inputs)
-                # During evaluation, you may choose to use the base loss only
+
                 loss = criterion(outputs.squeeze(), labels.float())
                 val_loss += loss.item()
         
@@ -61,6 +115,7 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
 
     return model
 
+
 def predict_mlp(model, test_loader, device: torch.device, threshold=0.5):
     model.eval()
     all_preds = []
@@ -73,31 +128,3 @@ def predict_mlp(model, test_loader, device: torch.device, threshold=0.5):
             preds = (probs > threshold).float()
             all_preds.append(preds)
     return torch.cat(all_preds, dim=0)
-
-
-def penalized_loss_binary(outputs, targets, criterion, penalty_coefficient=0.8):
-    """
-    Computes the standard loss (e.g., BCEWithLogitsLoss) and adds a penalty
-    term if the average predicted probability deviates from 0.5.
-    
-    Args:
-        outputs: Raw model outputs (logits) of shape (batch_size,).
-        targets: Ground truth labels of shape (batch_size,).
-        criterion: The base loss function (e.g., BCEWithLogitsLoss).
-        penalty_coefficient: How strongly to penalize imbalanced predictions.
-        
-    Returns:
-        Combined loss value.
-    """
-    # Compute the primary loss (e.g., binary cross entropy)
-    loss = criterion(outputs.squeeze(), targets.float())
-    
-    # Convert logits to probabilities
-    probs = torch.sigmoid(outputs)
-    # Calculate the average predicted probability for the positive class
-    avg_prob = probs.mean()
-    
-    # Penalize if avg_prob deviates from 0.5
-    penalty = penalty_coefficient * (avg_prob - 0.5)**2
-    
-    return loss + penalty
