@@ -61,11 +61,11 @@ parser.add_argument('--suffix_name', type=str,
                     help='name suffix for the experiment')
 parser.add_argument('--metrics_name', type=str, default='metrics',
                     help='name for metrics file')
-parser.add_argument('--batch_size', type=int, default=32,
+parser.add_argument('--batch_size', type=int, default=28,
                     help='size of the batch')
 parser.add_argument('--hidden_size', type=float, default=128,
                     help='hidden size of the MLP network')
-parser.add_argument('--epochs', type=int, default=400,
+parser.add_argument('--epochs', type=int, default=100,
                     help='number of epochs to train')
 parser.add_argument('--test_size', type=float, default=0.3,
                     help='test size')
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     
 
     os.makedirs(input_path, exist_ok=True)
-    os.makedirs(data_path, exist_ok=True)
+    #os.makedirs(data_path, exist_ok=True)
     os.makedirs(model_path, exist_ok=True)
     os.makedirs(metrics_path, exist_ok=True)
     model_name = f"{args.model_name}{args.suffix_name}"
@@ -100,6 +100,8 @@ if __name__ == '__main__':
     # Features and target
     features = df.drop(columns=['filename', 'target'])
     input_size = features.shape[1]
+    print("input size:")
+    print(input_size)
     target = df['target']
 
     # Train-test split
