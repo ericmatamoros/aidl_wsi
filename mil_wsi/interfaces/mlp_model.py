@@ -52,6 +52,8 @@ class MLP(nn.Module):
     
 
 def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, use_focal_loss=True):
+    train_losses = []  # Guardar la loss de cada época
+    val_losses = []
     """
     Train an MLP model using either standard loss or Focal Loss.
 
@@ -92,6 +94,7 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
             running_loss += loss.item()
         
         avg_train_loss = running_loss / len(train_loader)
+        train_losses.append(avg_train_loss)
 
         # Evaluation phase
         model.eval()
@@ -106,6 +109,7 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
                 val_loss += loss.item()
         
         avg_val_loss = val_loss / len(val_loader)
+        val_losses.append(avg_val_loss)
 
         logger.info(
             f'Epoch [{epoch+1}/{epochs}], '
@@ -113,7 +117,7 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
             f'Val Loss: {avg_val_loss:.4f}'
         )
 
-    return model
+    return model, train_losses, val_losses
 
 
 def predict_mlp(model, test_loader, device: torch.device, threshold=0.5):
