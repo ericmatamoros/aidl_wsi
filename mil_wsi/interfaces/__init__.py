@@ -11,6 +11,9 @@ from .mlp_model import (
 from .mlp_dataset import (
     MLPDataset
 )
+from .plot_loss import (
+    plot_loss
+)
 
 __all__: list[str] = [
     "compute_metrics",
@@ -18,4 +21,5 @@ __all__: list[str] = [
     "predict_mlp",
     "MLP",
     "MLPDataset"
+    "plot_loss"
 ]

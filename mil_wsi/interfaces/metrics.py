@@ -4,9 +4,9 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 def compute_metrics(y_pred, y_true):
     
     # Calculate precision, recall, and F1 score
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, pos_label=1)
+    recall = recall_score(y_true, y_pred, pos_label=1)
+    f1 = f1_score(y_true, y_pred, pos_label=1)
     
     # Compute confusion matrix
     cm = confusion_matrix(y_true, y_pred)
