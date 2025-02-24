@@ -11,6 +11,9 @@ from .mlp_model import (
 from .mlp_dataset import (
     MLPDataset
 )
+from .plot_loss import (
+    plot_loss
+)
 
 from .mil_dataset import (
     MILBagDataset
@@ -32,7 +35,6 @@ __all__: list[str] = [
     "train_mlp",
     "predict_mlp",
     "MLP",
-    "MLPDataset",
     "MILBagDataset",
     "MIL",
     "train_mil", 
@@ -40,4 +42,6 @@ __all__: list[str] = [
     "AttentionMIL",
     "train_attention_mil",
     "predict_attention_mil",
+    "MLPDataset"
+    "plot_loss"
 ]
