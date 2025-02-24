@@ -158,7 +158,11 @@ if __name__ == '__main__':
     logger.info("Computing classification metrics")
     metrics = compute_metrics(predictions, y_test)
 
-    metrics['confusion_matrix'] = metrics['confusion_matrix'].to_dict()
+    metrics['confusion_matrix'] = {
+        f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
+        for i in range(metrics['confusion_matrix'].shape[0])
+        for j in range(metrics['confusion_matrix'].shape[1])
+    }
     with open(f'{metrics_path}{metrics_name}.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 

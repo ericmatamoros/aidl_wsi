@@ -51,7 +51,7 @@
                 "--data_slide_dir", "./mil_wsi/data/",
                 "--csv_path", "./mil_wsi/results/process_list_autogen.csv",
                 "--feat_dir", "./mil_wsi/results/",
-                "--model_name", "uni_v1",
+                "--model_name", "conch_v1",
                 "--batch_size", "512",
                 "--slide_ext", ".svs"
             ],
@@ -81,12 +81,51 @@
             "problemMatcher": []
         },
         {
+            "label": "mil_model",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "CUDA_VISIBLE_DEVICES=0",
+                "python",
+                "-m", "mil_wsi.scripts.mil_model",
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_mil"
+
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "attention_mil_model",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "CUDA_VISIBLE_DEVICES=0",
+                "python",
+                "-m", "mil_wsi.scripts.attention_mil_model",
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_attention_mil",
+            ],
+            "problemMatcher": []
+        }
+        {
             "label": "pipeline",
             "type": "shell",
             "dependsOn": [
                 "create_patches",
                 "extract_features",
-                "mlp_model"
+                "mlp_model",
+                "mil_model",
+                "attention_mil_model"
             ],
             "dependsOrder": "sequence",
             "problemMatcher": []

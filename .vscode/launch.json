@@ -74,6 +74,49 @@
                 "--dir_metrics", "./mil_wsi/metrics/",
                 "--suffix_name", "_mlp"
             ]
+        },
+        {
+            "name": "mil_model",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.mil_model",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_mil"
+            ]
+        },
+        {
+            "name": "attention_mil_model",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.scripts.attention_mil_model",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/",
+                "--dir_model", "./mil_wsi/models/",
+                "--dir_metrics", "./mil_wsi/metrics/",
+                "--suffix_name", "_mil",
+                "--batch_size", "1",
+                "--hidden_size", "128",
+                "--epochs", "5",
+                "--test_size", "0.3",
+                "--highlight_threshold", "0.5"
+            ]
         }
     ]
 }
