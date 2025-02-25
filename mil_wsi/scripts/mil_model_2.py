@@ -80,10 +80,10 @@ if __name__ == '__main__':
         predictions = predict_mil(model, val_loader, device)
         predictions = predictions.cpu().numpy().round().astype(int)
 
-        fold_metrics = compute_metrics(predictions, [y for _, y in val_dataset])
+        fold_metrics = compute_metrics(predictions, [y for _, y, _  in val_dataset])
         all_metrics.append(fold_metrics)
 
-        fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y in val_dataset]})
+        fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _  in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
 
     final_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0].keys()}
@@ -98,10 +98,15 @@ if __name__ == '__main__':
     predictions = predict_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y in test_dataset]})
+    preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _  in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
-    metrics = compute_metrics(predictions, [y for _, y in test_dataset])
+    metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
+    metrics['confusion_matrix'] = {
+        f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
+        for i in range(metrics['confusion_matrix'].shape[0])
+        for j in range(metrics['confusion_matrix'].shape[1])
+    }
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 
