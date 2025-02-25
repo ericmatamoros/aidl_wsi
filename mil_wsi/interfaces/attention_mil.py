@@ -56,7 +56,7 @@ def train_attention_mil(model, train_loader, criterion, optimizer, device, epoch
         correct = 0
         total = 0
 
-        for bags, labels in train_loader:
+        for bags, labels, _  in train_loader:
             bags, labels = bags.to(device), labels.to(device).float()  # Convert labels to float
 
             optimizer.zero_grad()
