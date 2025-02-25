@@ -56,7 +56,7 @@ def train_mil(model, train_loader, criterion, optimizer, device, epochs):
         correct = 0
         total = 0
 
-        for bags, labels in train_loader:
+        for bags, labels, _  in train_loader:
             bags, labels = bags.to(device), labels.to(device).float()  # Convert labels to float
 
             optimizer.zero_grad()
@@ -85,7 +85,7 @@ def predict_mil(model, test_loader, device):
     all_preds = []
 
     with torch.no_grad():
-        for bags, _ in test_loader:
+        for bags, _ , _ in test_loader:
             bags = bags.to(device)
             outputs = model(bags).squeeze(1)
             preds = (torch.sigmoid(outputs) > 0.5).float()  # Convert to float tensor

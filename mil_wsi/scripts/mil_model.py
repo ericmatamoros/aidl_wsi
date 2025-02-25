@@ -87,11 +87,11 @@ if __name__ == '__main__':
     predictions = predict_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y in test_dataset]})
+    preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}{predictions_name}.csv", index=False)
 
     logger.info("Computing classification metrics")
-    metrics = compute_metrics(predictions, [y for _, y in test_dataset])
+    metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
 
     metrics['confusion_matrix'] = {
         f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])

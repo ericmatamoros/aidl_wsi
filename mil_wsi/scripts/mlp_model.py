@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_size', type=float, default=128, help='Hidden size of the MLP network')
     parser.add_argument('--epochs', type=int, default=3, help='Number of epochs to train')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
-    parser.add_argument('--k_splits', type=int, default=5, help='Number of train-test splits to perform')
+    parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
 
 
     args = parser.parse_args()
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     )
 
     # Define the number of folds for cross-validation (change if needed)
-    n_splits = args.k_splits
+    n_splits = args.k_folds
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     # Variables to store metrics and losses for each fold
