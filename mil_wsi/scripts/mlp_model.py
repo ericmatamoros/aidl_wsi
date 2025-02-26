@@ -37,7 +37,7 @@ def load_data(input_path: str, files_pt: list, target: pd.DataFrame):
         df_dims = df_dims.merge(target.drop(columns = 'slide'), on = ['filename'], how = "left")
         df_list.append(df_dims)
 
-    
+     
     df = pd.concat(df_list)
 
     return df
@@ -126,10 +126,12 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    #MLP Loader    
+    #MLP Loader
     model = MLP(input_size=input_size, hidden_size=hidden_size, output_size=1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
+
+    exit()
 
     if os.path.exists(f"{model_path}{model_name}") is False:
         logger.info("Training MLP model")
