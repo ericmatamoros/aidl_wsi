@@ -51,8 +51,6 @@ class MLP(nn.Module):
     
 
 def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, use_focal_loss=True):
-    train_losses = []  # Guardar la loss de cada época
-    val_losses = []
     """
     Train an MLP model using either standard loss or Focal Loss.
 
@@ -69,6 +67,9 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
     Returns:
     Trained model
     """
+
+    train_losses = []
+    val_losses = []
     focal_loss = FocalLoss() if use_focal_loss else None
 
     for epoch in range(epochs):

@@ -2,6 +2,7 @@
 *.svs
 *.pyc
 *.png
+*.jpg
 *.json
 *.csv
 *.pth
