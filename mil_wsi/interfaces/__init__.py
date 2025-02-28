@@ -26,8 +26,9 @@ from .mil_model import (
 
 from .attention_mil import(
     AttentionMIL,
+    MultiHeadAttention,
     train_attention_mil,
-    predict_attention_mil,
+    predict_attention_mil
 )
 
 __all__: list[str] = [

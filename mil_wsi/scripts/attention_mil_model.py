@@ -19,7 +19,8 @@ from mil_wsi.interfaces import (
     train_attention_mil, 
     predict_attention_mil, 
     MILBagDataset, 
-    AttentionMIL
+    AttentionMIL,
+    MultiHeadAttention
 )
 
 import warnings
@@ -147,14 +148,15 @@ if __name__ == '__main__':
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         input_size = next(iter(train_loader))[0].shape[-1]
-        model = AttentionMIL(input_size=input_size, hidden_size=args.hidden_size, output_size=1)
+        #model = AttentionMIL(input_size=input_size, hidden_size=args.hidden_size, output_size=1)
+        model = MultiHeadAttention(input_size=input_size, hidden_size=args.hidden_size, n_heads=5)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=0.001)
         
-        model = train_attention_mil(model, train_loader, criterion, optimizer, device, args.epochs)
+        model, attn_weights = train_attention_mil(model, train_loader,  criterion, optimizer, device, args.epochs)
         
         logger.info("Performing validation predictions")
         predictions, attn_weights, bag_ids = predict_attention_mil(model, val_loader, device)
