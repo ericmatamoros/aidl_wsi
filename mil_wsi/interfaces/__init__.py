@@ -25,6 +25,13 @@ from .weighted_model import(
     predict_weighted_model,
 )
 
+from .attention_mil import(
+    AttentionMIL,
+    MultiHeadAttention,
+    AttentionMILMLP,
+    train_attention_mil,
+    predict_attention_mil,
+)
 
 __all__: list[str] = [
     "compute_metrics",
