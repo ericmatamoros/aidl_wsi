@@ -13,6 +13,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import seaborn as sns
+from openslide import OpenSlide
 
 from mil_wsi.interfaces import (
     compute_metrics, 
@@ -63,23 +64,29 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
                 print(attn_scores)
                 attn_scores = (attn_scores - np.min(attn_scores)) / (np.max(attn_scores) - np.min(attn_scores) + 1e-8)
 
-                # Get WSI dimensions
-                slide = OpenSlide(wsi_path)
+                # Get WSI dimensions (px)
+                slide = OpenSlide(wsi_img_path)
                 WSI_WIDTH, WSI_HEIGHT = slide.dimensions
-                wsi_h, wsi_w = mask_img.shape[:2]
+                # Get mask dimensions (px)
+                MASK_HEIGHT, MASK_WIDTH = mask_img.shape[:2]
+
+                # Calculate scaling factors
+                SCALE_X = MASK_WIDTH / WSI_WIDTH
+                SCALE_Y = MASK_HEIGHT / WSI_HEIGHT
 
                 # Create empty heatmap
-                heatmap = np.zeros((wsi_h, wsi_w), dtype=np.float32)
+                heatmap = np.zeros((MASK_HEIGHT, MASK_WIDTH), dtype=np.float32)
 
                 # Overlay attention scores at correct WSI locations
                 for (x, y), attn in zip(patches, attn_scores):
                     assert len(patches) == len(attn_scores), f"Mismatch: {len(patches)} patches vs {len(attn_scores)} attn scores"
 
-                    x, y = int(x), int(y)
+                    # Adjust the coordinates and patch size
+                    x, y = int(x*SCALE_X), int(y*SCALE_Y)
                     print(f"Coordinates: {x}, {y} with attention {attn}")
                     heatmap[y:y + patch_size, x:x + patch_size] += attn  # Accumulate attention
                 
-                print(f"For the image: {wsi_name} with dimentions: {wsi_h}, {wsi_w}")
+                print(f"For the image: {wsi_name} with dimentions: {MASK_HEIGHT}, {MASK_WIDTH}")
                 
                 # Normalize heatmap to [0, 1]
                 heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
