@@ -43,5 +43,11 @@ __all__: list[str] = [
     "train_weighted_model",
     "predict_weighted_model",
     "MLPDataset"
-    "plot_loss"
+    "plot_loss",
+    "AttentionMIL",
+    "MultiHeadAttention",
+    "AttentionMILMLP",
+    "train_attention_mil",
+    "predict_attention_mil",
+
 ]

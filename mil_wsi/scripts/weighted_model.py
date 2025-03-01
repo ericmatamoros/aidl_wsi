@@ -188,7 +188,10 @@ if __name__ == '__main__':
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
     
-    final_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0].keys()}
+    final_metrics = {
+        key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
+        for key in all_metrics[0].keys()
+    }
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
         json.dump(final_metrics, json_file, indent=4)
 

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from loguru import logger
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
@@ -123,10 +123,10 @@ parser.add_argument('--dir_model', type=str, help='Path to store the trained mod
 parser.add_argument('--dir_metrics', type=str, help='Path to store metrics')
 parser.add_argument('--model_name', type=str, default='mil_model', help='Name of the model')
 parser.add_argument('--predictions_name', type=str, default='predictions', help='Name for predictions file')
-parser.add_argument('--suffix_name', type=str, help='Name suffix for the experiment')
 parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
 parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MIL network')
+parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
 parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
@@ -137,12 +137,13 @@ if __name__ == '__main__':
     input_path = args.dir_results
     data_path = args.dir_data
     model_path = args.dir_model
-    metrics_path = f"{args.dir_metrics}/{args.suffix_name}"
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
+    metrics_path = f"{args.dir_metrics}/{suffix_name}"
     os.makedirs(metrics_path, exist_ok=True)
 
-    model_name = f"{args.model_name}{args.suffix_name}"
-    predictions_name = f"{args.predictions_name}{args.suffix_name}"
-    metrics_name = f"{args.metrics_name}{args.suffix_name}"
+    model_name = f"{args.model_name}{suffix_name}"
+    predictions_name = f"{args.predictions_name}{suffix_name}"
+    metrics_name = f"{args.metrics_name}{suffix_name}"
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
@@ -150,12 +151,18 @@ if __name__ == '__main__':
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
 
-    dataset = MILBagDataset(input_path, files_pt, target)
+    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
+    targets = [dataset[i][1] for i in range(len(dataset))]
+    
+    # Split dataset into train and test
+    train_idx, test_idx = train_test_split(np.arange(len(dataset)), test_size=args.test_size, stratify=targets, random_state=42)
+    train_dataset = torch.utils.data.Subset(dataset, train_idx)
+    test_dataset = torch.utils.data.Subset(dataset, test_idx)
+
     n_splits = args.k_folds
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    targets = [dataset[i][1] for i in range(len(dataset))]
+    train_targets = [dataset[i][1] for i in train_idx]
 
-    
     all_metrics = []
 
     logger.info("Starting K-Fold Cross-Validation")
@@ -190,19 +197,21 @@ if __name__ == '__main__':
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
     
-    final_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0].keys()}
+    final_metrics = {
+        key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
+        for key in all_metrics[0].keys()
+    }
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
         json.dump(final_metrics, json_file, indent=4)
 
     logger.info("Evaluating on final test set")
-    test_dataset = torch.utils.data.Subset(dataset, val_idx)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     
     model.eval()
     predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    visualize_attention(attn_weights, bag_ids, predictions, data_path, args.suffix_name, args.highlight_threshold)
+    visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
 
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)

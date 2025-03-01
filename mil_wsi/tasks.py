@@ -13,7 +13,8 @@ def main():
         "3": ("Extract Features", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.extract_features --data_h5_dir ./mil_wsi/results/ --data_slide_dir ./mil_wsi/data/ --csv_path ./mil_wsi/results/process_list_autogen.csv --feat_dir ./mil_wsi/results/ --model_name conch_v1 --batch_size 512 --slide_ext .svs"),
         "4": ("MLP Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
         "6": ("Weighted Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.weighted_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "7": ("Run Full Pipeline", ""),
+        "7": ("Attention MIL", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.attention_mil_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
+        "8": ("Run Full Pipeline", ""),
     }
     
     print("Select a task to run:")
@@ -25,8 +26,8 @@ def main():
     if choice in tasks:
         name, command = tasks[choice]
         print(f"Running: {name}\n")
-        if choice == "7":  # Full pipeline
-            for task_key in ["2", "3", "4", "5", "6"]:
+        if choice == "8":  # Full pipeline
+            for task_key in ["2", "3", "4", "5", "6", "7"]:
                 print(f"Executing: {tasks[task_key][0]}")
                 run_task(tasks[task_key][1])
         else:

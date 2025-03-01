@@ -182,7 +182,10 @@ if __name__ == '__main__':
         all_metrics.append(fold_metrics)
 
     # Average validation metrics across folds
-    final_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0].keys()}
+    final_metrics = {
+        key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
+        for key in all_metrics[0].keys()
+    }
 
     # Save final averaged validation metrics to JSON
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
