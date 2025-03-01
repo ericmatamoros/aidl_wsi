@@ -5,40 +5,29 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
-class AttentionMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size=1):
-        super(AttentionMIL, self).__init__()
-
-        # Feature extractor
-        self.feature_extractor = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU()
-        )
+class WeightedModel(nn.Module):
+    def __init__(self, input_size, output_size=1):
+        super(WeightedModel, self).__init__()
 
         # Attention mechanism
         self.attention = nn.Sequential(
-            nn.Linear(hidden_size, 128),
+            nn.Linear(input_size, 128),
             nn.Tanh(),
             nn.Linear(128, 1)
         )
 
         # Classification layer
-        self.classifier = nn.Linear(hidden_size, output_size)
+        self.classifier = nn.Linear(input_size, output_size)
 
     def forward(self, x):
         batch_size, N_instances, _ = x.shape
 
-        # Extract features
-        features = self.feature_extractor(x)
-
         # Compute attention weights
-        attn_weights = self.attention(features)  # Shape: (batch_size, N_instances, 1)
+        attn_weights = self.attention(x)  # Shape: (batch_size, N_instances, 1)
         attn_weights = torch.softmax(attn_weights, dim=1)  # Normalize
 
         # Compute weighted bag representation
-        bag_representation = torch.sum(attn_weights * features, dim=1)
+        bag_representation = torch.sum(attn_weights * x, dim=1)
 
         # Classification output
         output = self.classifier(bag_representation)
@@ -47,16 +36,21 @@ class AttentionMIL(nn.Module):
 
 
 
-def train_attention_mil(model, train_loader, criterion, optimizer, device, epochs):
-    model.train()
+def train_weighted_model(model, train_loader, val_loader, criterion, optimizer, device, epochs):
     model.to(device)
+    
+    train_losses = []
+    val_losses = []
+    best_val_loss = float('inf')
+    best_model_state = None
 
     for epoch in range(epochs):
+        model.train()
         total_loss = 0.0
         correct = 0
         total = 0
 
-        for bags, labels, _  in train_loader:
+        for bags, labels, _ in train_loader:
             bags, labels = bags.to(device), labels.to(device).float()  # Convert labels to float
 
             optimizer.zero_grad()
@@ -72,12 +66,41 @@ def train_attention_mil(model, train_loader, criterion, optimizer, device, epoch
             correct += (preds == labels).sum().item()
             total += labels.size(0)
 
-        accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
+        train_loss = total_loss / len(train_loader)
+        train_losses.append(train_loss)
+        train_accuracy = correct / total
 
-    return model
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for bags, labels, _ in val_loader:
+                bags, labels = bags.to(device), labels.to(device).float()
+                outputs, _ = model(bags)
+                outputs = outputs.squeeze(1)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
 
-def predict_attention_mil(model, test_loader, device):
+        val_loss /= len(val_loader)
+        val_losses.append(val_loss)
+
+        print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Val Loss: {val_loss:.4f}")
+
+        # Save the best model based on validation loss
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model_state = model.state_dict()
+
+    # Load the best model state at the end
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        print("Loaded the best model based on validation loss.")
+
+    return model, train_losses, val_losses
+
+
+
+def predict_weighted_model(model, test_loader, device):
     model.eval()
     model.to(device)
 
