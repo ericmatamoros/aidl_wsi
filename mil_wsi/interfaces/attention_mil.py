@@ -5,6 +5,27 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
+class AttentionMILMLP(nn.Module):
+    def __init__(self, input_size, hidden_size, attention_class, n_heads = 5, output_size=1):
+        super(AttentionMILMLP, self).__init__()
+        
+        if attention_class == "AttentionMIL":
+            self.attention_mil = AttentionMIL(input_size, hidden_size)  # Instancia de atención
+        else:
+            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)  # Instancia de atención
+        self.classifier = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+        )
+
+    def forward(self, x):
+        bag_representation, attn_weights = self.attention_mil(x)
+        output = self.classifier(bag_representation)  # Pasa por MLP externa
+        return output, attn_weights
+
+
+
 class AttentionMIL(nn.Module):
     def __init__(self, input_size, hidden_size, output_size=1):
         super(AttentionMIL, self).__init__()
@@ -13,17 +34,6 @@ class AttentionMIL(nn.Module):
         self.V = nn.Linear(input_size, hidden_size, bias=False)  # Replaces V * h_i^T
         self.U = nn.Linear(input_size, hidden_size, bias=False)  # Replaces U * h_i^T
         self.w = nn.Linear(hidden_size, 1, bias=False)  # Replaces w^T * (...)
-
-        # Definicion MLP
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        # Capa oculta a capa de salida
-        self.fc2 = nn.Linear(hidden_size, output_size)
-        # Función de activación relu
-        self.relu = nn.ReLU()
-        # funcion de activacion sigmoid
-        self.sigmoid = nn.Sigmoid()
-        
-
 
     def forward(self, x):
         batch_size, N_instances, _ = x.shape  # Shape: (batch_size, N, M)
@@ -41,10 +51,6 @@ class AttentionMIL(nn.Module):
         
         # Compute weighted sum
         bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)  # Shape: (batch_size, input_size)
-
-        # Propagación hacia adelante
-        bag_representation = self.relu(self.fc1(bag_representation))  # Aplicamos ReLU después de la primera capa
-        bag_representation = self.fc2(bag_representation)  # Salida de la segunda capa
         
         return bag_representation, attn_weights
 
@@ -124,6 +130,6 @@ def predict_attention_mil(model, test_loader, device):
             all_attn_weights.append(attn_weights.cpu().numpy())
 
             # Store bag IDs for explainability
-            all_bag_ids.append(basename)
+            all_bag_ids.append(basename[0])
 
     return torch.tensor(all_preds, dtype=torch.float32), all_attn_weights, all_bag_ids

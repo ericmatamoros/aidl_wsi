@@ -20,13 +20,14 @@ from mil_wsi.interfaces import (
     predict_attention_mil, 
     MILBagDataset, 
     AttentionMIL,
-    MultiHeadAttention
+    MultiHeadAttention,
+    AttentionMILMLP
 )
 
 import warnings
 warnings.filterwarnings("ignore")
 
-def visualize_attention(all_attn_weights, all_filenames, predictions, input_path, suffix, threshold=0.5, patch_size=224):
+def visualize_attention(all_attn_weights, all_filenames, predictions, data_path, suffix, threshold=0.5, patch_size=224):
     """
     Save WSI images with highlighted patches based on attention scores.
 
@@ -41,14 +42,17 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, input_path
     """
     explainability_dir = f"explainability{suffix}"
     os.makedirs(explainability_dir, exist_ok=True)
+    print(all_filenames)
 
     for i, (attn_weights, wsi_name) in enumerate(zip(all_attn_weights, all_filenames)):
         if int(predictions[i]) == 1:  # Only highlight for cancer predictions
-            wsi_img_path = os.path.join(f"{input_path}/masks/", f"{wsi_name[0]}.jpg")
-            h5_patch_path = os.path.join(f"{input_path}/patches/", f"{wsi_name[0]}.h5")
+            print(attn_weights)
+            wsi_img_path = os.path.join(f"{data_path}images/", f"{wsi_name}.svs")
+            mask_img_path = os.path.join(f"{data_path}patches/masks/", f"{wsi_name}.jpg")
+            h5_patch_path = os.path.join(f"{data_path}patches/patches/", f"{wsi_name}.h5")
 
-            if os.path.exists(wsi_img_path) and os.path.exists(h5_patch_path):  # Ensure both WSI and patches exist
-                wsi_img = plt.imread(wsi_img_path)  # Load WSI image
+            if os.path.exists(mask_img_path) and os.path.exists(h5_patch_path) and os.path.exists(wsi_img_path):  # Ensure WSI, patches and masks exist
+                mask_img = plt.imread(mask_img_path)  # Load WSI image
 
                 # Load patch coordinates from the .h5 file
                 with h5py.File(h5_patch_path, "r") as f:
@@ -56,28 +60,36 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, input_path
 
                 # Normalize attention scores
                 attn_scores = attn_weights[0].flatten()
+                print(attn_scores)
                 attn_scores = (attn_scores - np.min(attn_scores)) / (np.max(attn_scores) - np.min(attn_scores) + 1e-8)
 
                 # Get WSI dimensions
-                wsi_h, wsi_w = wsi_img.shape[:2]
+                slide = OpenSlide(wsi_path)
+                WSI_WIDTH, WSI_HEIGHT = slide.dimensions
+                wsi_h, wsi_w = mask_img.shape[:2]
 
                 # Create empty heatmap
                 heatmap = np.zeros((wsi_h, wsi_w), dtype=np.float32)
 
                 # Overlay attention scores at correct WSI locations
                 for (x, y), attn in zip(patches, attn_scores):
-                    x, y = int(x), int(y)
-                    heatmap[y:y + patch_size, x:x + patch_size] += attn  # Accumulate attention
+                    assert len(patches) == len(attn_scores), f"Mismatch: {len(patches)} patches vs {len(attn_scores)} attn scores"
 
+                    x, y = int(x), int(y)
+                    print(f"Coordinates: {x}, {y} with attention {attn}")
+                    heatmap[y:y + patch_size, x:x + patch_size] += attn  # Accumulate attention
+                
+                print(f"For the image: {wsi_name} with dimentions: {wsi_h}, {wsi_w}")
+                
                 # Normalize heatmap to [0, 1]
                 heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
-
+                
                 # Resize heatmap to match WSI dimensions
                 heatmap_resized = cv2.GaussianBlur(heatmap, (5, 5), 0)  # Smoothen heatmap
                 heatmap_colored = cv2.applyColorMap((heatmap_resized * 255).astype(np.uint8), cv2.COLORMAP_JET)
 
                 # Blend heatmap with original WSI
-                overlay = cv2.addWeighted(wsi_img, 0.6, heatmap_colored, 0.4, 0)
+                overlay = cv2.addWeighted(mask_img, 0.6, heatmap_colored, 0.4, 0)
 
                 # Apply threshold mask for high-attention patches
                 highlight_mask = heatmap_resized > threshold
@@ -135,6 +147,7 @@ if __name__ == '__main__':
     n_splits = args.k_folds
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     targets = [dataset[i][1] for i in range(len(dataset))]
+
     
     all_metrics = []
 
@@ -148,8 +161,10 @@ if __name__ == '__main__':
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         input_size = next(iter(train_loader))[0].shape[-1]
-        #model = AttentionMIL(input_size=input_size, hidden_size=args.hidden_size, output_size=1)
-        model = MultiHeadAttention(input_size=input_size, hidden_size=args.hidden_size, n_heads=5)
+
+        model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="AttentionMIL")
+        #model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="MultiHeadAttention", n_heads = 10)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
@@ -180,7 +195,7 @@ if __name__ == '__main__':
     predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    visualize_attention(attn_weights, bag_ids, predictions, input_path, args.suffix_name, args.highlight_threshold)
+    visualize_attention(attn_weights, bag_ids, predictions, data_path, args.suffix_name, args.highlight_threshold)
 
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
