@@ -14,7 +14,8 @@ def main():
         "4": ("MLP Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
         "6": ("Weighted Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.weighted_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
         "7": ("Attention MIL", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.attention_mil_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "8": ("Run Full Pipeline", ""),
+        "8": ("Transformer MIL", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.transformer_mil_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
+        "9": ("Run Full Pipeline", ""),
     }
     
     print("Select a task to run:")
@@ -26,8 +27,8 @@ def main():
     if choice in tasks:
         name, command = tasks[choice]
         print(f"Running: {name}\n")
-        if choice == "8":  # Full pipeline
-            for task_key in ["2", "3", "4", "5", "6", "7"]:
+        if choice == "9":  # Full pipeline
+            for task_key in ["2", "3", "4", "5", "6", "7", "8"]:
                 print(f"Executing: {tasks[task_key][0]}")
                 run_task(tasks[task_key][1])
         else:
