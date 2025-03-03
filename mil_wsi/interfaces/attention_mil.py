@@ -5,45 +5,72 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
+class AttentionMILMLP(nn.Module):
+    def __init__(self, input_size, hidden_size, attention_class, n_heads = 5, output_size=1):
+        super(AttentionMILMLP, self).__init__()
+        
+        if attention_class == "AttentionMIL":
+            self.attention_mil = AttentionMIL(input_size, hidden_size)  # Instancia de atención
+        else:
+            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)  # Instancia de atención
+        self.classifier = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+        )
+
+    def forward(self, x):
+        bag_representation, attn_weights = self.attention_mil(x)
+        output = self.classifier(bag_representation)  # Pasa por MLP externa
+        return output, attn_weights
+
+
+
 class AttentionMIL(nn.Module):
     def __init__(self, input_size, hidden_size, output_size=1):
         super(AttentionMIL, self).__init__()
-
-        # Feature extractor
-        self.feature_extractor = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU()
-        )
-
-        # Attention mechanism
-        self.attention = nn.Sequential(
-            nn.Linear(hidden_size, 128),
-            nn.Tanh(),
-            nn.Linear(128, 1)
-        )
-
-        # Classification layer
-        self.classifier = nn.Linear(hidden_size, output_size)
+        
+        # Linear layers to replace matmul operations
+        self.V = nn.Linear(input_size, hidden_size, bias=False)  # Replaces V * h_i^T
+        self.U = nn.Linear(input_size, hidden_size, bias=False)  # Replaces U * h_i^T
+        self.w = nn.Linear(hidden_size, 1, bias=False)  # Replaces w^T * (...)
 
     def forward(self, x):
-        batch_size, N_instances, _ = x.shape
-
-        # Extract features
-        features = self.feature_extractor(x)
-
+        batch_size, N_instances, _ = x.shape  # Shape: (batch_size, N, M)
+        
+        # Apply linear transformations
+        Vh = torch.tanh(self.V(x))  # Shape: (batch_size, N, hidden_size)
+        Uh = torch.sigmoid(self.U(x))  # Shape: (batch_size, N, hidden_size)
+        
+        # Element-wise multiplication (Gated Mechanism)
+        gated_output = Vh * Uh  # Shape: (batch_size, N, hidden_size)
+        
         # Compute attention weights
-        attn_weights = self.attention(features)  # Shape: (batch_size, N_instances, 1)
-        attn_weights = torch.softmax(attn_weights, dim=1)  # Normalize
+        attn_logits = self.w(gated_output).squeeze(-1)  # Shape: (batch_size, N)
+        attn_weights = torch.softmax(attn_logits, dim=1)  # Normalize
+        
+        # Compute weighted sum
+        bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)  # Shape: (batch_size, input_size)
+        
+        return bag_representation, attn_weights
 
-        # Compute weighted bag representation
-        bag_representation = torch.sum(attn_weights * features, dim=1)
+class MultiHeadAttention(nn.Module):
+    def __init__(self, input_size, hidden_size, n_heads):
+        super(MultiHeadAttention, self).__init__()
+        self.n_heads = n_heads
+        self.heads = nn.ModuleList([
+            AttentionMIL(input_size, hidden_size) for _ in range(n_heads)
+        ])
+    
+    def forward(self, x):
+        head_outputs = [head(x) for head in self.heads]
 
-        # Classification output
-        output = self.classifier(bag_representation)
+        attn_weights = torch.cat([output[1].unsqueeze(0) for output in head_outputs], dim=0)
+        attn_weights = torch.mean(attn_weights, dim=0)
 
-        return output, attn_weights  # Return both logits & attention weights
+        bag_representation = head_outputs[0][0]
+
+        return bag_representation, attn_weights
 
 
 
@@ -75,7 +102,7 @@ def train_attention_mil(model, train_loader, criterion, optimizer, device, epoch
         accuracy = correct / total
         print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
 
-    return model
+    return model, attn_weights
 
 def predict_attention_mil(model, test_loader, device):
     model.eval()
@@ -103,6 +130,6 @@ def predict_attention_mil(model, test_loader, device):
             all_attn_weights.append(attn_weights.cpu().numpy())
 
             # Store bag IDs for explainability
-            all_bag_ids.append(basename)
+            all_bag_ids.append(basename[0])
 
     return torch.tensor(all_preds, dtype=torch.float32), all_attn_weights, all_bag_ids

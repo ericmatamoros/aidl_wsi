@@ -2,34 +2,7 @@ from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2.0, reduction='mean'):
-        """
-        Focal Loss for binary classification.
-        alpha: Balancing factor for positive and negative classes.
-        gamma: Focusing parameter.
-        reduction: 'mean' or 'sum' (default is 'mean').
-        """
-        super(FocalLoss, self).__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-        self.reduction = reduction
-
-    def forward(self, logits, targets):
-        """
-        logits: Model outputs (before sigmoid).
-        targets: Ground-truth labels (0 or 1).
-        """
-        probs = torch.sigmoid(logits)  # Convert logits to probabilities
-        probs = torch.clamp(probs, min=1e-6, max=1-1e-6)  # Prevent log(0) errors
-        
-        # Compute focal loss components
-        focal_weight = self.alpha * (1 - probs) ** self.gamma * targets + (1 - self.alpha) * probs ** self.gamma * (1 - targets)
-        loss = -focal_weight * (targets * torch.log(probs) + (1 - targets) * torch.log(1 - probs))
-
-        return loss.mean() if self.reduction == 'mean' else loss.sum()
-
+from .focal_loss import FocalLoss
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -48,11 +21,10 @@ class MLP(nn.Module):
             x = self.relu(self.fc1(x))  # Aplicamos ReLU después de la primera capa
             x = self.fc2(x)  # Salida de la segunda capa
             return x
-    
 
-def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, use_focal_loss=True):
+def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: torch.device, epochs: int, use_focal_loss=True, save_path="best_model.pth"):
     """
-    Train an MLP model using either standard loss or Focal Loss.
+    Train an MLP model using either standard loss or Focal Loss and load the best model.
 
     Arguments:
     model: PyTorch MLP model
@@ -63,13 +35,16 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
     device: CUDA or CPU device
     epochs: Number of training epochs
     use_focal_loss: Whether to use Focal Loss for training
+    save_path: Path to save the best model
     
     Returns:
-    Trained model
+    Trained model (best based on validation loss), train losses, and val losses.
     """
 
     train_losses = []
     val_losses = []
+    best_val_loss = float("inf")
+    best_epoch = -1  # Store the best epoch
     focal_loss = FocalLoss() if use_focal_loss else None
 
     for epoch in range(epochs):
@@ -111,13 +86,26 @@ def train_mlp(model, train_loader, val_loader, criterion, optimizer, device: tor
         avg_val_loss = val_loss / len(val_loader)
         val_losses.append(avg_val_loss)
 
+        # Checkpointing the best model
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            best_epoch = epoch + 1  # Save the best epoch (1-based index)
+            torch.save(model.state_dict(), save_path)
+            logger.info(f"Best model saved at epoch {best_epoch} with val loss {avg_val_loss:.4f}")
+
         logger.info(
             f'Epoch [{epoch+1}/{epochs}], '
             f'Train Loss: {avg_train_loss:.4f}, '
             f'Val Loss: {avg_val_loss:.4f}'
         )
 
+    # Load the best model
+    model.load_state_dict(torch.load(save_path, map_location=device))
+    logger.info(f"Loaded best model from epoch {best_epoch} with val loss {best_val_loss:.4f}")
+
     return model, train_losses, val_losses
+
+
 
 
 def predict_mlp(model, test_loader, device: torch.device, threshold=0.5):

@@ -18,16 +18,26 @@ from .plot_loss import (
 from .mil_dataset import (
     MILBagDataset
 )
-from .mil_model import (
-    MIL,
-    train_mil,
-    predict_mil
+
+from .weighted_model import(
+    WeightedModel,
+    train_weighted_model,
+    predict_weighted_model,
 )
 
 from .attention_mil import(
     AttentionMIL,
+    MultiHeadAttention,
+    AttentionMILMLP,
     train_attention_mil,
     predict_attention_mil,
+)
+
+from .transformer_mil import (
+    TransformerMIL,
+    TransformerMILMLP,
+    train_transformer_model,
+    predict_transformer_model
 )
 
 __all__: list[str] = [
@@ -36,12 +46,17 @@ __all__: list[str] = [
     "predict_mlp",
     "MLP",
     "MILBagDataset",
-    "MIL",
-    "train_mil", 
-    "predict_mil",
+    "WeightedModel",
+    "train_weighted_model",
+    "predict_weighted_model",
+    "MLPDataset"
+    "plot_loss",
     "AttentionMIL",
+    "MultiHeadAttention",
+    "AttentionMILMLP",
     "train_attention_mil",
     "predict_attention_mil",
-    "MLPDataset"
-    "plot_loss"
+    "TransformerMILMLP",
+    "train_transformer_model",
+    "predict_transformer_model"
 ]

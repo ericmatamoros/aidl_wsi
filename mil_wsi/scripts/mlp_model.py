@@ -59,11 +59,10 @@ if __name__ == '__main__':
     parser.add_argument('--dir_metrics', type=str, help='Path to store metrics')
     parser.add_argument('--model_name', type=str, default='mlp_model', help='Name of the model')
     parser.add_argument('--predictions_name', type=str, default='predictions', help='Name for predictions file')
-    parser.add_argument('--suffix_name', type=str, help='Name suffix for the experiment')
     parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--hidden_size', type=float, default=128, help='Hidden size of the MLP network')
-    parser.add_argument('--epochs', type=int, default=90, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
     parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
 
@@ -74,8 +73,9 @@ if __name__ == '__main__':
     input_path = args.dir_results
     data_path = args.dir_data
     model_path = args.dir_model
-    metrics_path = f"{args.dir_metrics}/{args.suffix_name}"
-    loss_graph_path = f"{args.dir_metrics}/{args.suffix_name}/losses_graphs"
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
+    metrics_path = f"{args.dir_metrics}/{suffix_name}"
+    loss_graph_path = f"{args.dir_metrics}/{suffix_name}/losses_graphs"
 
     os.makedirs(input_path, exist_ok=True)
     #os.makedirs(data_path, exist_ok=True)
@@ -83,9 +83,9 @@ if __name__ == '__main__':
     os.makedirs(metrics_path, exist_ok=True)
     os.makedirs(loss_graph_path, exist_ok=True)
 
-    model_name = f"{args.model_name}{args.suffix_name}"
-    predictions_name = f"{args.predictions_name}{args.suffix_name}"
-    metrics_name = f"{args.metrics_name}{args.suffix_name}"
+    model_name = f"{args.model_name}{suffix_name}"
+    predictions_name = f"{args.predictions_name}{suffix_name}"
+    metrics_name = f"{args.metrics_name}{suffix_name}"
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
@@ -184,7 +184,10 @@ if __name__ == '__main__':
         all_metrics.append(fold_metrics)
 
     # Average validation metrics across folds
-    final_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0].keys()}
+    final_metrics = {
+        key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
+        for key in all_metrics[0].keys()
+    }
 
     # Save final averaged validation metrics to JSON
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
@@ -194,8 +197,8 @@ if __name__ == '__main__':
     logger.info("K-Fold Cross-Validation Completed")
 
     # Plot training and validation loss graphs
-    plot_loss(train_losses_total, loss_graph_path, args.suffix_name, "train")
-    plot_loss(val_losses_total, loss_graph_path, args.suffix_name, "val")
+    plot_loss(train_losses_total, loss_graph_path, suffix_name, "train")
+    plot_loss(val_losses_total, loss_graph_path, suffix_name, "val")
 
     # Evaluation on the test set using the model from the last fold
     logger.info("Evaluating on final test set")

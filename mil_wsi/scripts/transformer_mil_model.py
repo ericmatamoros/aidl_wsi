@@ -17,12 +17,10 @@ from openslide import OpenSlide
 
 from mil_wsi.interfaces import (
     compute_metrics, 
-    train_attention_mil, 
-    predict_attention_mil, 
+    train_transformer_model, 
+    predict_transformer_model, 
     MILBagDataset, 
-    AttentionMIL,
-    MultiHeadAttention,
-    AttentionMILMLP
+    TransformerMILMLP,
 )
 
 from ._explainability import visualize_attention
@@ -30,9 +28,8 @@ from ._explainability import visualize_attention
 import warnings
 warnings.filterwarnings("ignore")
 
-
 # Argument Parser
-parser = argparse.ArgumentParser(description='Attention MIL model with K-Fold Cross-Validation')
+parser = argparse.ArgumentParser(description='Transformer MIL model with K-Fold Cross-Validation')
 parser.add_argument('--dir_results', type=str, help='Path to folder containing the results')
 parser.add_argument('--dir_data', type=str, help='Path containing slides')
 parser.add_argument('--dir_model', type=str, help='Path to store the trained models')
@@ -53,7 +50,7 @@ if __name__ == '__main__':
     input_path = args.dir_results
     data_path = args.dir_data
     model_path = args.dir_model
-    suffix_name = f"AttentionMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
+    suffix_name = f"TransformerMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
     metrics_path = f"{args.dir_metrics}/{suffix_name}"
     os.makedirs(metrics_path, exist_ok=True)
 
@@ -90,10 +87,9 @@ if __name__ == '__main__':
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-        input_size = next(iter(train_loader))[0].shape[-1]
+        input_size = next(iter(train_loader))[0].shape[-1] 
 
-        model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="AttentionMIL")
-        #model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="MultiHeadAttention", n_heads = 10)
+        model = TransformerMILMLP(input_size=input_size, hidden_size=args.hidden_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -101,10 +97,10 @@ if __name__ == '__main__':
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=0.001)
         
-        model, attn_weights = train_attention_mil(model, train_loader,  criterion, optimizer, device, args.epochs)
+        model, attn_weights = train_transformer_model(model, train_loader, criterion, optimizer, device, args.epochs)
         
         logger.info("Performing validation predictions")
-        predictions, attn_weights, bag_ids = predict_attention_mil(model, val_loader, device)
+        predictions, attn_weights, bag_ids = predict_transformer_model(model, val_loader, device)
         predictions = predictions.cpu().numpy().round().astype(int)
         
         fold_metrics = compute_metrics(predictions, [y for _, y, _ in val_dataset])
@@ -122,9 +118,9 @@ if __name__ == '__main__':
 
     logger.info("Evaluating on final test set")
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
-    
+
     model.eval()
-    predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
+    predictions, attn_weights, bag_ids = predict_transformer_model(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
     visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
@@ -133,11 +129,6 @@ if __name__ == '__main__':
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
     metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
-    metrics['confusion_matrix'] = {
-        f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
-        for i in range(metrics['confusion_matrix'].shape[0])
-        for j in range(metrics['confusion_matrix'].shape[1])
-    }
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 
