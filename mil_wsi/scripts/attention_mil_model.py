@@ -107,7 +107,7 @@ parser.add_argument('--suffix_name', type=str, help='Name suffix for the experim
 parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
 parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MIL network')
-parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
+parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
 

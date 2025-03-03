@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--hidden_size', type=float, default=128, help='Hidden size of the MLP network')
-    parser.add_argument('--epochs', type=int, default=3, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=90, help='Number of epochs to train')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
     parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
 

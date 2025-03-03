@@ -68,7 +68,6 @@
             "args": [
                 "run",
                 "-n", "wsi",
-                "CUDA_VISIBLE_DEVICES=0",
                 "python",
                 "-m", "mil_wsi.scripts.mlp_model",
                 "--dir_results", "./mil_wsi/results/",
@@ -86,7 +85,6 @@
             "args": [
                 "run",
                 "-n", "wsi",
-                "CUDA_VISIBLE_DEVICES=0",
                 "python",
                 "-m", "mil_wsi.scripts.mil_model",
                 "--dir_results", "./mil_wsi/results/",
@@ -105,7 +103,6 @@
             "args": [
                 "run",
                 "-n", "wsi",
-                "CUDA_VISIBLE_DEVICES=0",
                 "python",
                 "-m", "mil_wsi.scripts.attention_mil_model",
                 "--dir_results", "./mil_wsi/results/",
