@@ -76,7 +76,7 @@
                 "--dir_data", "./mil_wsi/data/",
                 "--dir_model", "./mil_wsi/models/",
                 "--dir_metrics", "./mil_wsi/metrics/",
-                "--suffix_name", "_mlp"
+                "--epochs", "100"
             ],
             "problemMatcher": []
         },
@@ -96,6 +96,20 @@
                 "--dir_metrics", "./mil_wsi/metrics/",
                 "--suffix_name", "_mil"
 
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "feature_projection",
+            "type": "shell",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n", "wsi",
+                "python",
+                "-m", "mil_wsi.scripts.feature_projection",
+                "--dir_results", "./mil_wsi/results/",
+                "--dir_data", "./mil_wsi/data/"
             ],
             "problemMatcher": []
         },
