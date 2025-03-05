@@ -1,6 +1,7 @@
 import os
 import argparse
 import pandas as pd
+import numpy as np
 import umap
 import matplotlib.pyplot as plt
 from loguru import logger
@@ -40,7 +41,7 @@ if __name__ == '__main__':
         df['filename'] = filenames
         dfs_list.append(df)
     dfs = pd.concat(dfs_list)
-    dfs = dfs.groupby('target').sample(500, random_state=SEED)
+    dfs = dfs.groupby('target').sample(2000, random_state=SEED)
 
     features = dfs.iloc[:, :-2].values  # All columns except 'target' and 'filename'
     targets = dfs["target"].values
