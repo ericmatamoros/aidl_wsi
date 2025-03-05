@@ -62,7 +62,7 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
                     # Adjust the coordinates and patch size
                     x, y = int(x*SCALE_X), int(y*SCALE_Y)
                     print(f"Coordinates: {x}, {y} with attention {attn}")
-                    heatmap[y:y + patch_size, x:x + patch_size] += attn  # Accumulate attention
+                    heatmap[y:y + int(patch_size*SCALE_X), x:x + int(patch_size*SCALE_Y)] += attn  # Accumulate attention
                 
                 print(f"For the image: {wsi_name} with dimentions: {MASK_HEIGHT}, {MASK_WIDTH}")
                 
@@ -79,7 +79,7 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
                 # Apply threshold mask for high-attention patches
                 highlight_mask = heatmap_resized > threshold
                 contours, _ = cv2.findContours(highlight_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(overlay, contours, -1, (0, 255, 0), 2)  # Green contours
+                #cv2.drawContours(overlay, contours, -1, (0, 255, 0), 2)  # Green contours
 
                 # Save the explainability image
                 plt.figure(figsize=(10, 10))
