@@ -3,16 +3,42 @@ import argparse
 import pandas as pd
 import numpy as np
 import umap
+import torch
 import matplotlib.pyplot as plt
 from loguru import logger
 
-from mil_wsi.interfaces import MILBagDataset
+from mil_wsi.interfaces import MLPDataset
 
 import warnings
 warnings.filterwarnings("ignore")
 
 SEED = 42
 np.random.seed(SEED)
+
+def load_data(input_path: str, files_pt: list, target: pd.DataFrame) -> pd.DataFrame:
+    """
+    Load data from .pt files, compute the mean along dimension 0, and merge with the target.
+
+    Args:
+        input_path (str): Path to the results folder.
+        files_pt (list): List of .pt filenames.
+        target (pd.DataFrame): DataFrame containing the target information.
+
+    Returns:
+        pd.DataFrame: DataFrame with features and merged target.
+    """
+    df_list = []
+    for file in files_pt:
+        basename = file.split(".pt")[0]
+        data = torch.load(f"{input_path}/pt_files/{file}")
+        data = torch.mean(data, dim=0).numpy()  # Compute the mean along dimension 0 of the loaded tensor.
+        df_dims = pd.DataFrame([data], columns=list(range(len(data))))
+        df_dims['filename'] = basename
+        df_dims = df_dims.merge(target.drop(columns='slide'), on='filename', how="left")
+        df_list.append(df_dims)
+
+    df = pd.concat(df_list).reset_index(drop=True)
+    return df
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='Feature Projection')
@@ -27,24 +53,19 @@ if __name__ == '__main__':
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
-    logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
+    # Uncomment the following line to invert target values if needed (positive class = 1)
+    target_counts = target['target'].value_counts()
+    print("Target Value Distribution:")
+    for value, count in target_counts.items():
+        print(f"Value {value}: {count} instances")
 
-    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
-    targets = [dataset[i][1] for i in range(len(dataset))]
+    # Load data from .pt files and merge with target
+    df = load_data(input_path, files_pt, target)
 
-    dfs_list = []
-    for bags, labels, filenames in dataset:
-        df = pd.DataFrame(bags)
-        df['target'] = labels
-        df['filename'] = filenames
-        dfs_list.append(df)
-    dfs = pd.concat(dfs_list)
-    dfs = dfs.groupby('target').sample(2000, random_state=SEED)
-
-    features = dfs.iloc[:, :-2].values  # All columns except 'target' and 'filename'
-    targets = dfs["target"].values
+    features = df.iloc[:, :-2].values  # All columns except 'target' and 'filename'
+    targets = df["target"].values
 
     # Apply UMAP
     logger.info("Generating UMAP")
