@@ -34,8 +34,7 @@ from .attention_mil import(
 )
 
 from .transformer_mil import (
-    TransformerMIL,
-    TransformerMILMLP,
+    MILModels,
     train_transformer_model,
     predict_transformer_model
 )
@@ -56,7 +55,7 @@ __all__: list[str] = [
     "AttentionMILMLP",
     "train_attention_mil",
     "predict_attention_mil",
-    "TransformerMILMLP",
+    "MILModels",
     "train_transformer_model",
     "predict_transformer_model"
 ]

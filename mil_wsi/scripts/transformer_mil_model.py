@@ -20,7 +20,7 @@ from mil_wsi.interfaces import (
     train_transformer_model, 
     predict_transformer_model, 
     MILBagDataset, 
-    TransformerMILMLP,
+    MILModels,
 )
 
 from ._explainability import visualize_attention
@@ -88,8 +88,8 @@ if __name__ == '__main__':
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         input_size = next(iter(train_loader))[0].shape[-1] 
-
-        model = TransformerMILMLP(input_size=input_size, hidden_size=args.hidden_size)
+        
+        model = MILModels(input_size=input_size, hidden_size=args.hidden_size, attention_class="Transformer")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
