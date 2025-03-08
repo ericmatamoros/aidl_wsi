@@ -77,7 +77,7 @@ if __name__ == '__main__':
 	dest_files = os.listdir(os.path.join(args.feat_dir, 'pt_files'))
 
 	model, img_transforms = get_encoder(args.model_name, target_img_size=args.target_patch_size)
-			
+
 	_ = model.eval()
 	model = model.to(device)
 	total = len(bags_dataset)

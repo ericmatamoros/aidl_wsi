@@ -58,13 +58,13 @@ if __name__ == '__main__':
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
-    files_pt = os.listdir(f"{input_path}/pt_files")
+    files_pt = os.listdir(f"{input_path}/pt_files_conch")
 
     logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
 
-    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
+    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files_conch"), target)
     targets = [dataset[i][1] for i in range(len(dataset))]
     
     # Split dataset into train and test

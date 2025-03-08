@@ -1,6 +1,7 @@
 import os
 from functools import partial
 import timm
+import transformers
 from .timm_wrapper import TimmCNNEncoder
 import torch
 from ..utils.constants import MODEL2CONSTANTS
@@ -8,10 +9,10 @@ from ..utils.transform_utils import get_eval_transforms
 
 def has_CONCH():
     HAS_CONCH = False
-    CONCH_CKPT_PATH = ''
+    CONCH_CKPT_PATH = 'CONCH/checkpoints/conch/pytorch_model.bin'
     # check if CONCH_CKPT_PATH is set and conch is installed, catch exception if not
     try:
-        from conch.open_clip_custom import create_model_from_pretrained
+        from mil_wsi.CONCH.conch.open_clip_custom import create_model_from_pretrained
         # check if CONCH_CKPT_PATH is set
         if 'CONCH_CKPT_PATH' not in os.environ:
             raise ValueError('CONCH_CKPT_PATH not set')
@@ -51,7 +52,7 @@ def get_encoder(model_name, target_img_size=224):
     elif model_name == 'conch_v1':
         HAS_CONCH, CONCH_CKPT_PATH = has_CONCH()
         assert HAS_CONCH, 'CONCH is not available'
-        from conch.open_clip_custom import create_model_from_pretrained
+        from mil_wsi.CONCH.conch.open_clip_custom import create_model_from_pretrained
         model, _ = create_model_from_pretrained("conch_ViT-B-16", CONCH_CKPT_PATH)
         model.forward = partial(model.encode_image, proj_contrast=False, normalize=False)
     elif model_name == 'conch_v1_5':

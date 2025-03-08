@@ -31,7 +31,7 @@ class TransformerMILMLP(nn.Module):
 
 
 class TransformerMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers=2, num_heads=8, dropout=0.1):
+    def __init__(self, input_size, hidden_size, num_layers=1, num_heads=4, dropout=0.1):
         super(TransformerMIL, self).__init__()
 
         # Ensure `input_size` is divisible by `num_heads`

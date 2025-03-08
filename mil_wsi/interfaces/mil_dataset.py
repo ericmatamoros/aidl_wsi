@@ -10,7 +10,7 @@ class MILBagDataset(Dataset):
 
         for file in files_pt:
             basename = file.split(".pt")[0]
-            data = torch.load(f"{input_path}/pt_files/{file}")  # Shape: (N_instances, D_features)
+            data = torch.load(f"{input_path}/pt_files_resnet/{file}")  # Shape: (N_instances, D_features)
             
             if data.ndim == 1:  # Ensure 2D structure
                 data = data.unsqueeze(0)

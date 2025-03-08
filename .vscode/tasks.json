@@ -56,7 +56,8 @@
             ],
             "options": {
                 "env": {
-                    "UNI_CKPT_PATH": "./mil_wsi/UNI/pytorch_model.bin"
+                    "UNI_CKPT_PATH": "./mil_wsi/UNI/pytorch_model.bin",
+                    "CONCH_CKPT_PATH": "./mil_wsi/CONCH/checkpoints/conch/pytorch_model.bin"
                 }
             },
             "problemMatcher": []
@@ -109,7 +110,6 @@
                 "--dir_data", "./mil_wsi/data/",
                 "--dir_model", "./mil_wsi/models/",
                 "--dir_metrics", "./mil_wsi/metrics/",
-                "--suffix_name", "_attention_mil",
             ],
             "problemMatcher": []
         }

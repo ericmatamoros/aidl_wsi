@@ -43,7 +43,7 @@ parser.add_argument('--metrics_name', type=str, default='metrics', help='Name fo
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
 parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MIL network')
 parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
-parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
+parser.add_argument('--epochs', type=int, default=15, help='Number of epochs to train')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
 
@@ -61,13 +61,13 @@ if __name__ == '__main__':
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
-    files_pt = os.listdir(f"{input_path}/pt_files")
+    files_pt = os.listdir(f"{input_path}/pt_files_resnet")
 
     logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
 
-    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
+    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files_resnet"), target)
     targets = [dataset[i][1] for i in range(len(dataset))]
     
     # Split dataset into train and test
