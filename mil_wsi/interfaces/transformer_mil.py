@@ -1,101 +1,100 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+from nystrom_attention import NystromAttention  # Make sure to install this package!
 
-# Original AttentionMIL module
-class AttentionMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size=1):
-        super(AttentionMIL, self).__init__()
-        
-        # Linear layers to replace matmul operations
-        self.V = nn.Linear(input_size, hidden_size, bias=False)  # Replaces V * h_i^T
-        self.U = nn.Linear(input_size, hidden_size, bias=False)  # Replaces U * h_i^T
-        self.w = nn.Linear(hidden_size, 1, bias=False)  # Replaces w^T * (...)
+from loguru import logger
 
-    def forward(self, x):
-        # x shape: (batch_size, N_instances, input_size)
-        Vh = torch.tanh(self.V(x))  # (batch_size, N, hidden_size)
-        Uh = torch.sigmoid(self.U(x))  # (batch_size, N, hidden_size)
-        gated_output = Vh * Uh  # Element-wise multiplication
-        
-        attn_logits = self.w(gated_output).squeeze(-1)  # (batch_size, N)
-        attn_weights = torch.softmax(attn_logits, dim=1)
-        bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)  # (batch_size, input_size)
-        
-        return bag_representation, attn_weights
 
-# Original MultiHeadAttention using AttentionMIL modules
-class MultiHeadAttention(nn.Module):
-    def __init__(self, input_size, hidden_size, n_heads):
-        super(MultiHeadAttention, self).__init__()
-        self.n_heads = n_heads
-        self.heads = nn.ModuleList([
-            AttentionMIL(input_size, hidden_size) for _ in range(n_heads)
-        ])
-    
-    def forward(self, x):
-        # Collect outputs from each head
-        head_outputs = [head(x) for head in self.heads]
-        # Concatenate attention weights from each head and average them
-        attn_weights = torch.cat([output[1].unsqueeze(0) for output in head_outputs], dim=0)
-        attn_weights = torch.mean(attn_weights, dim=0)
-        # Here we take the bag representation from the first head (alternatively, you can aggregate differently)
-        bag_representation = head_outputs[0][0]
-        return bag_representation, attn_weights
-
-# New Transformer-based MIL module
-class TransformerMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, n_heads, num_layers=1, dropout=0.1):
-        super(TransformerMIL, self).__init__()
-        # Project input features to the transformer model dimension (hidden_size)
-        self.input_proj = nn.Linear(input_size, hidden_size)
-        # Create a transformer encoder layer and stack num_layers of them
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=n_heads, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        # Instead of attention weights, we pool over the sequence dimension (instances)
-    
-    def forward(self, x):
-        # x: (batch, N, input_size)
-        x_proj = self.input_proj(x)  # (batch, N, hidden_size)
-        # Transformer expects (sequence length, batch, hidden_size)
-        x_proj = x_proj.transpose(0, 1)  # (N, batch, hidden_size)
-        x_encoded = self.transformer_encoder(x_proj)  # (N, batch, hidden_size)
-        x_encoded = x_encoded.transpose(0, 1)  # (batch, N, hidden_size)
-        # Simple pooling over instances (e.g., mean pooling)
-        bag_representation = x_encoded.mean(dim=1)  # (batch, hidden_size)
-        # For the transformer version, we are not directly returning attention weights
-        attn_weights = None
-        return bag_representation, attn_weights
-
-# Main model class: choose from different attention mechanisms (or transformer)
-class MILModels(nn.Module):
-    def __init__(self, input_size, hidden_size, attention_class, n_heads=8, output_size=1):
-        super(MILModels, self).__init__()
-        
-        # Depending on the attention_class, instantiate the corresponding module.
-        if attention_class == "AttentionMIL":
-            self.attention_mil = AttentionMIL(input_size, hidden_size)
-            classifier_input_size = input_size  # bag_representation is computed as weighted sum of x
-        elif attention_class == "MultiHeadAttention":
-            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)
-            classifier_input_size = input_size
-        elif attention_class == "Transformer":
-            self.attention_mil = TransformerMIL(input_size, hidden_size, n_heads)
-            classifier_input_size = hidden_size  # transformer returns representation of dimension hidden_size
-        else:
-            raise ValueError("Unsupported attention class. Choose from: 'AttentionMIL', 'MultiHeadAttention', 'Transformer'")
-        
-        # Classifier network that maps the bag representation to the final output
-        self.classifier = nn.Sequential(
-            nn.Linear(classifier_input_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
+class TransLayer(nn.Module):
+    def __init__(self, norm_layer=nn.LayerNorm, dim=512):
+        super().__init__()
+        self.norm = norm_layer(dim)
+        self.attn = NystromAttention(
+            dim = dim,
+            dim_head = dim // 8,
+            heads = 8,
+            num_landmarks = dim // 2,    # number of landmarks
+            pinv_iterations = 6,         # number of Moore-Penrose iterations for approximating pinverse
+            residual = True,             # extra residual connection on the value
+            dropout = 0.1
         )
 
     def forward(self, x):
-        bag_representation, attn_weights = self.attention_mil(x)
-        output = self.classifier(bag_representation)
-        return output, attn_weights
+        x = x + self.attn(self.norm(x))
+        return x
+
+class PPEG(nn.Module):
+    def __init__(self, dim):
+        super(PPEG, self).__init__()
+        self.proj = nn.Conv2d(dim, dim, kernel_size=7, stride=1, padding=7//2, groups=dim)
+        self.proj1 = nn.Conv2d(dim, dim, kernel_size=5, stride=1, padding=5//2, groups=dim)
+        self.proj2 = nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=3//2, groups=dim)
+
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        cls_token, feat_token = x[:, 0], x[:, 1:]
+        # Reshape features into a 2D grid
+        cnn_feat = feat_token.transpose(1, 2).view(B, C, H, W)
+        x = self.proj(cnn_feat) + cnn_feat + self.proj1(cnn_feat) + self.proj2(cnn_feat)
+        x = x.flatten(2).transpose(1, 2)
+        # Prepend the class token
+        x = torch.cat((cls_token.unsqueeze(1), x), dim=1)
+        return x
+
+class TransMIL(nn.Module):
+    def __init__(self, n_classes, in_dim):
+        super(TransMIL, self).__init__()
+        self.in_dim = in_dim
+        self.pos_layer = PPEG(dim=in_dim)
+        # Now use `in_dim` instead of hardcoding 1024.
+        self._fc1 = nn.Sequential(nn.Linear(in_dim, in_dim), nn.ReLU())
+        self.cls_token = nn.Parameter(torch.randn(1, 1, in_dim))
+        self.n_classes = n_classes
+        self.layer1 = TransLayer(dim=in_dim)
+        self.layer2 = TransLayer(dim=in_dim)
+        self.norm = nn.LayerNorm(in_dim)
+        self._fc2 = nn.Linear(in_dim, self.n_classes)
+
+    def forward(self, **kwargs):
+        # Expect kwargs['data'] to have shape [B, n, in_dim]
+        h = kwargs['data'].float()  # [B, n, in_dim]
+        h = self._fc1(h)            # [B, n, 512]
+
+        # Pad so that n_patches can form a 2D grid.
+        H = h.shape[1]
+        _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+        add_length = _H * _W - H
+        h = torch.cat([h, h[:, :add_length, :]], dim=1)  # [B, N, 512]
+
+        B = h.shape[0]
+        cls_tokens = self.cls_token.expand(B, -1, -1).to(h.device)
+        h = torch.cat((cls_tokens, h), dim=1)  # [B, 1+N, 512]
+
+        h = self.layer1(h)
+        h = self.pos_layer(h, _H, _W)
+        h = self.layer2(h)
+
+        # Use the class token for prediction.
+        h = self.norm(h)[:, 0]
+        logits = self._fc2(h)
+        Y_hat = torch.argmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim=1)
+        results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
+        return results_dict
+
+class TransformerMIL(nn.Module):
+    def __init__(self, input_size, output_size=1):
+        super().__init__()  # Ensure the parent class is initialized properly
+
+        # Define submodules after calling super()
+        self.attention_mil = TransMIL(n_classes=output_size, in_dim=input_size)
+        self.classifier = nn.Identity()
+
+    def forward(self, x):
+        logits = self.attention_mil(data=x)['logits']
+        return logits, None
 
 # Training function (unchanged)
 def train_transformer_model(model, train_loader, criterion, optimizer, device, epochs):
@@ -124,7 +123,7 @@ def train_transformer_model(model, train_loader, criterion, optimizer, device, e
             total += labels.size(0)
 
         accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
+        logger.info(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
 
     return model, attn_weights
 

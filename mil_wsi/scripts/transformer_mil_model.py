@@ -20,7 +20,7 @@ from mil_wsi.interfaces import (
     train_transformer_model, 
     predict_transformer_model, 
     MILBagDataset, 
-    MILModels,
+    TransformerMIL,
 )
 
 from ._explainability import visualize_attention
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
         input_size = next(iter(train_loader))[0].shape[-1] 
         
-        model = MILModels(input_size=input_size, hidden_size=args.hidden_size, attention_class="Transformer")
+        model = TransformerMIL(input_size=input_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
