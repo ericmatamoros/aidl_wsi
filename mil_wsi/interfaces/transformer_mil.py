@@ -1,101 +1,158 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from einops import rearrange
+from torch import nn
 
-# Original AttentionMIL module
-class AttentionMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size=1):
-        super(AttentionMIL, self).__init__()
-        
-        # Linear layers to replace matmul operations
-        self.V = nn.Linear(input_size, hidden_size, bias=False)  # Replaces V * h_i^T
-        self.U = nn.Linear(input_size, hidden_size, bias=False)  # Replaces U * h_i^T
-        self.w = nn.Linear(hidden_size, 1, bias=False)  # Replaces w^T * (...)
+# --- Transformer building blocks (as provided) ---
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+class Attention(nn.Module):
+    def __init__(self, dim=512, heads=8, dim_head=None, dropout=0.1):
+        super().__init__()
+        if dim_head is None:
+            dim_head = dim // heads
+        inner_dim = dim_head * heads
+        project_out = not (heads == 1 and dim_head == dim)
+
+        self.heads = heads
+        self.scale = dim_head ** -0.5
+
+        self.attend = nn.Softmax(dim=-1)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        ) if project_out else nn.Identity()
 
     def forward(self, x):
-        # x shape: (batch_size, N_instances, input_size)
-        Vh = torch.tanh(self.V(x))  # (batch_size, N, hidden_size)
-        Uh = torch.sigmoid(self.U(x))  # (batch_size, N, hidden_size)
-        gated_output = Vh * Uh  # Element-wise multiplication
-        
-        attn_logits = self.w(gated_output).squeeze(-1)  # (batch_size, N)
-        attn_weights = torch.softmax(attn_logits, dim=1)
-        bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)  # (batch_size, input_size)
-        
-        return bag_representation, attn_weights
+        # x shape: (batch, n, dim)
+        qkv = self.to_qkv(x).chunk(3, dim=-1)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
+        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        attn = self.attend(dots)
+        out = torch.matmul(attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        return self.to_out(out)
 
-# Original MultiHeadAttention using AttentionMIL modules
-class MultiHeadAttention(nn.Module):
-    def __init__(self, input_size, hidden_size, n_heads):
-        super(MultiHeadAttention, self).__init__()
-        self.n_heads = n_heads
-        self.heads = nn.ModuleList([
-            AttentionMIL(input_size, hidden_size) for _ in range(n_heads)
-        ])
-    
+class FeedForward(nn.Module):
+    def __init__(self, dim=512, hidden_dim=1024, dropout=0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
     def forward(self, x):
-        # Collect outputs from each head
-        head_outputs = [head(x) for head in self.heads]
-        # Concatenate attention weights from each head and average them
-        attn_weights = torch.cat([output[1].unsqueeze(0) for output in head_outputs], dim=0)
-        attn_weights = torch.mean(attn_weights, dim=0)
-        # Here we take the bag representation from the first head (alternatively, you can aggregate differently)
-        bag_representation = head_outputs[0][0]
-        return bag_representation, attn_weights
+        return self.net(x)
 
-# New Transformer-based MIL module
+class TransformerLayer(nn.Module):
+    def __init__(self, norm_layer=nn.LayerNorm, dim=512, heads=8, use_ff=True, use_norm=True):
+        super().__init__()
+        self.norm = norm_layer(dim)
+        self.attn = Attention(dim=dim, heads=heads, dim_head=dim // heads)
+        self.use_ff = use_ff
+        self.use_norm = use_norm
+        if self.use_ff:
+            self.ff = FeedForward(dim=dim)
+    def forward(self, x):
+        if self.use_norm:
+            x = x + self.attn(self.norm(x))
+        else:
+            x = x + self.attn(x)
+        if self.use_ff:
+            x = x + self.ff(x)
+        return x
+
+# --- New TransformerMIL module using the above transformer blocks ---
 class TransformerMIL(nn.Module):
-    def __init__(self, input_size, hidden_size, n_heads, num_layers=1, dropout=0.1):
-        super(TransformerMIL, self).__init__()
-        # Project input features to the transformer model dimension (hidden_size)
-        self.input_proj = nn.Linear(input_size, hidden_size)
-        # Create a transformer encoder layer and stack num_layers of them
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=n_heads, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        # Instead of attention weights, we pool over the sequence dimension (instances)
-    
-    def forward(self, x):
-        # x: (batch, N, input_size)
-        x_proj = self.input_proj(x)  # (batch, N, hidden_size)
-        # Transformer expects (sequence length, batch, hidden_size)
-        x_proj = x_proj.transpose(0, 1)  # (N, batch, hidden_size)
-        x_encoded = self.transformer_encoder(x_proj)  # (N, batch, hidden_size)
-        x_encoded = x_encoded.transpose(0, 1)  # (batch, N, hidden_size)
-        # Simple pooling over instances (e.g., mean pooling)
-        bag_representation = x_encoded.mean(dim=1)  # (batch, hidden_size)
-        # For the transformer version, we are not directly returning attention weights
-        attn_weights = None
-        return bag_representation, attn_weights
+    def __init__(self, input_size, hidden_size=512, num_layers=2, heads=8, num_classes=1, dropout=0.1):
+        """
+        Args:
+            input_size: Dimension of each patch's feature vector.
+            hidden_size: Internal transformer dimension.
+            num_layers: Number of TransformerLayer blocks.
+            heads: Number of attention heads.
+            num_classes: Number of output classes (1 for binary classification).
+            dropout: Dropout probability.
+        """
+        super().__init__()
+        # Project input features into the transformer embedding space.
+        self.fc1 = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU()
+        )
+        # Stack transformer layers.
+        self.layers = nn.ModuleList([
+            TransformerLayer(dim=hidden_size, heads=heads, use_ff=False, use_norm=True)
+            for _ in range(num_layers)
+        ])
+        # Final classification head.
+        self.fc2 = nn.Linear(hidden_size, num_classes)
 
-# Main model class: choose from different attention mechanisms (or transformer)
+    def forward(self, x, _=None):
+        """
+        Args:
+            x: Tensor of shape (batch, n_patches, input_size).
+        Returns:
+            logits: (batch, num_classes)
+        """
+        h = self.fc1(x)  # (batch, n_patches, hidden_size)
+        for layer in self.layers:
+            h = layer(h)
+        # Aggregate patch representations via mean pooling.
+        h = h.mean(dim=1)  # (batch, hidden_size)
+        logits = self.fc2(h)  # (batch, num_classes)
+        return logits
+
+# --- MILModels that integrates different attention modules ---
+# (We assume AttentionMIL and MultiHeadAttention are defined elsewhere.)
 class MILModels(nn.Module):
-    def __init__(self, input_size, hidden_size, attention_class, n_heads=8, output_size=1):
+    def __init__(self, input_size, hidden_size, attention_class, n_heads=8, output_size=1,
+                 num_layers=2, dropout=0.1):
         super(MILModels, self).__init__()
-        
-        # Depending on the attention_class, instantiate the corresponding module.
         if attention_class == "AttentionMIL":
             self.attention_mil = AttentionMIL(input_size, hidden_size)
-            classifier_input_size = input_size  # bag_representation is computed as weighted sum of x
+            classifier_input_size = input_size  # bag_representation from AttentionMIL.
         elif attention_class == "MultiHeadAttention":
             self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)
             classifier_input_size = input_size
         elif attention_class == "Transformer":
-            self.attention_mil = TransformerMIL(input_size, hidden_size, n_heads)
-            classifier_input_size = hidden_size  # transformer returns representation of dimension hidden_size
+            # Here we use our new TransformerMIL module.
+            self.attention_mil = TransformerMIL(input_size, hidden_size,
+                                                 num_layers=num_layers, heads=n_heads,
+                                                 num_classes=output_size, dropout=dropout)
+            classifier_input_size = hidden_size  # Not used since TransformerMIL outputs logits.
         else:
             raise ValueError("Unsupported attention class. Choose from: 'AttentionMIL', 'MultiHeadAttention', 'Transformer'")
         
-        # Classifier network that maps the bag representation to the final output
-        self.classifier = nn.Sequential(
-            nn.Linear(classifier_input_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
-        )
+        # For non-transformer modules, we use a separate classifier.
+        if attention_class != "Transformer":
+            self.classifier = nn.Sequential(
+                nn.Linear(classifier_input_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, output_size)
+            )
+        else:
+            self.classifier = nn.Identity()  # Already integrated in TransformerMIL.
 
     def forward(self, x):
-        bag_representation, attn_weights = self.attention_mil(x)
-        output = self.classifier(bag_representation)
-        return output, attn_weights
+        if isinstance(self.attention_mil, TransformerMIL):
+            # TransformerMIL already produces logits.
+            logits = self.attention_mil(x)
+            return logits, None  # No explicit attention weights.
+        else:
+            bag_representation, attn_weights = self.attention_mil(x)
+            output = self.classifier(bag_representation)
+            return output, attn_weights
+
 
 # Training function (unchanged)
 def train_transformer_model(model, train_loader, criterion, optimizer, device, epochs):
