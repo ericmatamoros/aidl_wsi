@@ -15,3 +15,4 @@ git+https://github.com/oval-group/smooth-topk.git
 tensorboardX
 loguru
 umap-learn
+NystromAttention

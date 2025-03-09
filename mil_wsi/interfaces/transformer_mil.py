@@ -1,157 +1,100 @@
 import torch
-from einops import rearrange
-from torch import nn
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from nystrom_attention import NystromAttention  # Make sure to install this package!
 
-# --- Transformer building blocks (as provided) ---
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.fn = fn
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
+from loguru import logger
 
-class Attention(nn.Module):
-    def __init__(self, dim=512, heads=8, dim_head=None, dropout=0.1):
-        super().__init__()
-        if dim_head is None:
-            dim_head = dim // heads
-        inner_dim = dim_head * heads
-        project_out = not (heads == 1 and dim_head == dim)
 
-        self.heads = heads
-        self.scale = dim_head ** -0.5
-
-        self.attend = nn.Softmax(dim=-1)
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
-
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
-        ) if project_out else nn.Identity()
-
-    def forward(self, x):
-        # x shape: (batch, n, dim)
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-        attn = self.attend(dots)
-        out = torch.matmul(attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
-        return self.to_out(out)
-
-class FeedForward(nn.Module):
-    def __init__(self, dim=512, hidden_dim=1024, dropout=0.1):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
-
-class TransformerLayer(nn.Module):
-    def __init__(self, norm_layer=nn.LayerNorm, dim=512, heads=8, use_ff=True, use_norm=True):
+class TransLayer(nn.Module):
+    def __init__(self, norm_layer=nn.LayerNorm, dim=512):
         super().__init__()
         self.norm = norm_layer(dim)
-        self.attn = Attention(dim=dim, heads=heads, dim_head=dim // heads)
-        self.use_ff = use_ff
-        self.use_norm = use_norm
-        if self.use_ff:
-            self.ff = FeedForward(dim=dim)
+        self.attn = NystromAttention(
+            dim = dim,
+            dim_head = dim // 8,
+            heads = 8,
+            num_landmarks = dim // 2,    # number of landmarks
+            pinv_iterations = 6,         # number of Moore-Penrose iterations for approximating pinverse
+            residual = True,             # extra residual connection on the value
+            dropout = 0.1
+        )
+
     def forward(self, x):
-        if self.use_norm:
-            x = x + self.attn(self.norm(x))
-        else:
-            x = x + self.attn(x)
-        if self.use_ff:
-            x = x + self.ff(x)
+        x = x + self.attn(self.norm(x))
         return x
 
-# --- New TransformerMIL module using the above transformer blocks ---
+class PPEG(nn.Module):
+    def __init__(self, dim):
+        super(PPEG, self).__init__()
+        self.proj = nn.Conv2d(dim, dim, kernel_size=7, stride=1, padding=7//2, groups=dim)
+        self.proj1 = nn.Conv2d(dim, dim, kernel_size=5, stride=1, padding=5//2, groups=dim)
+        self.proj2 = nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=3//2, groups=dim)
+
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        cls_token, feat_token = x[:, 0], x[:, 1:]
+        # Reshape features into a 2D grid
+        cnn_feat = feat_token.transpose(1, 2).view(B, C, H, W)
+        x = self.proj(cnn_feat) + cnn_feat + self.proj1(cnn_feat) + self.proj2(cnn_feat)
+        x = x.flatten(2).transpose(1, 2)
+        # Prepend the class token
+        x = torch.cat((cls_token.unsqueeze(1), x), dim=1)
+        return x
+
+class TransMIL(nn.Module):
+    def __init__(self, n_classes, in_dim):
+        super(TransMIL, self).__init__()
+        self.in_dim = in_dim
+        self.pos_layer = PPEG(dim=in_dim)
+        # Now use `in_dim` instead of hardcoding 1024.
+        self._fc1 = nn.Sequential(nn.Linear(in_dim, in_dim), nn.ReLU())
+        self.cls_token = nn.Parameter(torch.randn(1, 1, in_dim))
+        self.n_classes = n_classes
+        self.layer1 = TransLayer(dim=in_dim)
+        self.layer2 = TransLayer(dim=in_dim)
+        self.norm = nn.LayerNorm(in_dim)
+        self._fc2 = nn.Linear(in_dim, self.n_classes)
+
+    def forward(self, **kwargs):
+        # Expect kwargs['data'] to have shape [B, n, in_dim]
+        h = kwargs['data'].float()  # [B, n, in_dim]
+        h = self._fc1(h)            # [B, n, 512]
+
+        # Pad so that n_patches can form a 2D grid.
+        H = h.shape[1]
+        _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+        add_length = _H * _W - H
+        h = torch.cat([h, h[:, :add_length, :]], dim=1)  # [B, N, 512]
+
+        B = h.shape[0]
+        cls_tokens = self.cls_token.expand(B, -1, -1).to(h.device)
+        h = torch.cat((cls_tokens, h), dim=1)  # [B, 1+N, 512]
+
+        h = self.layer1(h)
+        h = self.pos_layer(h, _H, _W)
+        h = self.layer2(h)
+
+        # Use the class token for prediction.
+        h = self.norm(h)[:, 0]
+        logits = self._fc2(h)
+        Y_hat = torch.argmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim=1)
+        results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
+        return results_dict
+
 class TransformerMIL(nn.Module):
-    def __init__(self, input_size, hidden_size=512, num_layers=2, heads=8, num_classes=1, dropout=0.1):
-        """
-        Args:
-            input_size: Dimension of each patch's feature vector.
-            hidden_size: Internal transformer dimension.
-            num_layers: Number of TransformerLayer blocks.
-            heads: Number of attention heads.
-            num_classes: Number of output classes (1 for binary classification).
-            dropout: Dropout probability.
-        """
-        super().__init__()
-        # Project input features into the transformer embedding space.
-        self.fc1 = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.ReLU()
-        )
-        # Stack transformer layers.
-        self.layers = nn.ModuleList([
-            TransformerLayer(dim=hidden_size, heads=heads, use_ff=False, use_norm=True)
-            for _ in range(num_layers)
-        ])
-        # Final classification head.
-        self.fc2 = nn.Linear(hidden_size, num_classes)
+    def __init__(self, input_size, output_size=1):
+        super().__init__()  # Ensure the parent class is initialized properly
 
-    def forward(self, x, _=None):
-        """
-        Args:
-            x: Tensor of shape (batch, n_patches, input_size).
-        Returns:
-            logits: (batch, num_classes)
-        """
-        h = self.fc1(x)  # (batch, n_patches, hidden_size)
-        for layer in self.layers:
-            h = layer(h)
-        # Aggregate patch representations via mean pooling.
-        h = h.mean(dim=1)  # (batch, hidden_size)
-        logits = self.fc2(h)  # (batch, num_classes)
-        return logits
-
-# --- MILModels that integrates different attention modules ---
-# (We assume AttentionMIL and MultiHeadAttention are defined elsewhere.)
-class MILModels(nn.Module):
-    def __init__(self, input_size, hidden_size, attention_class, n_heads=8, output_size=1,
-                 num_layers=2, dropout=0.1):
-        super(MILModels, self).__init__()
-        if attention_class == "AttentionMIL":
-            self.attention_mil = AttentionMIL(input_size, hidden_size)
-            classifier_input_size = input_size  # bag_representation from AttentionMIL.
-        elif attention_class == "MultiHeadAttention":
-            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)
-            classifier_input_size = input_size
-        elif attention_class == "Transformer":
-            # Here we use our new TransformerMIL module.
-            self.attention_mil = TransformerMIL(input_size, hidden_size,
-                                                 num_layers=num_layers, heads=n_heads,
-                                                 num_classes=output_size, dropout=dropout)
-            classifier_input_size = hidden_size  # Not used since TransformerMIL outputs logits.
-        else:
-            raise ValueError("Unsupported attention class. Choose from: 'AttentionMIL', 'MultiHeadAttention', 'Transformer'")
-        
-        # For non-transformer modules, we use a separate classifier.
-        if attention_class != "Transformer":
-            self.classifier = nn.Sequential(
-                nn.Linear(classifier_input_size, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, output_size)
-            )
-        else:
-            self.classifier = nn.Identity()  # Already integrated in TransformerMIL.
+        # Define submodules after calling super()
+        self.attention_mil = TransMIL(n_classes=output_size, in_dim=input_size)
+        self.classifier = nn.Identity()
 
     def forward(self, x):
-        if isinstance(self.attention_mil, TransformerMIL):
-            # TransformerMIL already produces logits.
-            logits = self.attention_mil(x)
-            return logits, None  # No explicit attention weights.
-        else:
-            bag_representation, attn_weights = self.attention_mil(x)
-            output = self.classifier(bag_representation)
-            return output, attn_weights
+        logits = self.attention_mil(data=x)['logits']
+        return logits, None
 
 
 # Training function (unchanged)
@@ -181,7 +124,7 @@ def train_transformer_model(model, train_loader, criterion, optimizer, device, e
             total += labels.size(0)
 
         accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
+        logger.info(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
 
     return model, attn_weights
 
