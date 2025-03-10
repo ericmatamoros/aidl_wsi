@@ -22,7 +22,8 @@ from mil_wsi.interfaces import (
     MILBagDataset, 
     AttentionMIL,
     MultiHeadAttention,
-    AttentionMILMLP
+    AttentionMILMLP,
+    plot_loss
 )
 
 from ._explainability import visualize_attention
@@ -79,7 +80,11 @@ if __name__ == '__main__':
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     train_targets = [dataset[i][1] for i in train_idx]
 
+    # Variables to store metrics and losses for each fold
     all_metrics = []
+    all_predictions = []
+    train_losses_total = []
+    val_losses_total = []
 
     logger.info("Starting K-Fold Cross-Validation")
     for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(targets)), targets)):
@@ -123,6 +128,9 @@ if __name__ == '__main__':
     logger.info("Evaluating on final test set")
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     
+    # Plot training and validation loss graphs
+    plot_loss(val_losses_total, loss_graph_path, suffix_name, "val")
+
     model.eval()
     predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
