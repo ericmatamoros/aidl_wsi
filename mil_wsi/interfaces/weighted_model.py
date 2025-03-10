@@ -23,16 +23,16 @@ class WeightedModel(nn.Module):
         batch_size, N_instances, _ = x.shape
 
         # Compute attention weights
-        attn_weights = self.attention(x)  # Shape: (batch_size, N_instances, 1)
-        attn_weights = torch.softmax(attn_weights, dim=1)  # Normalize
+        pool_weights = self.attention(x)  # Shape: (batch_size, N_instances, 1)
+        pool_weights = torch.softmax(pool_weights, dim=1)  # Normalize
 
         # Compute weighted bag representation
-        bag_representation = torch.sum(attn_weights * x, dim=1)
+        bag_representation = torch.sum(pool_weights * x, dim=1)
 
         # Classification output
         output = self.classifier(bag_representation)
 
-        return output, attn_weights  # Return both logits & attention weights
+        return output, pool_weights  # Return both logits & attention weights
 
 
 
@@ -54,7 +54,7 @@ def train_weighted_model(model, train_loader, val_loader, criterion, optimizer, 
             bags, labels = bags.to(device), labels.to(device).float()  # Convert labels to float
 
             optimizer.zero_grad()
-            outputs, attn_weights = model(bags)  # Extract both predictions & attention scores
+            outputs, pool_weights = model(bags)  # Extract both predictions & attention scores
             outputs = outputs.squeeze(1)  # Ensure shape matches labels
             loss = criterion(outputs, labels)
 
@@ -105,7 +105,7 @@ def predict_weighted_model(model, test_loader, device):
     model.to(device)
 
     all_preds = []
-    all_attn_weights = []
+    all_pool_weights = []
     all_bag_ids = []
 
     with torch.no_grad():
@@ -113,7 +113,7 @@ def predict_weighted_model(model, test_loader, device):
             bags = bags.to(device)
 
             # Extract predictions & attention scores
-            outputs, attn_weights = model(bags)
+            outputs, pool_weights = model(bags)
             outputs = outputs.squeeze(1)
 
             # Convert to probabilities & binary predictions
@@ -123,9 +123,9 @@ def predict_weighted_model(model, test_loader, device):
             all_preds.extend(preds.cpu().numpy())
 
             # Store attention weights (converted to numpy)
-            all_attn_weights.append(attn_weights.cpu().numpy())
+            all_pool_weights.append(pool_weights.cpu().numpy())
 
             # Store bag IDs for explainability
             all_bag_ids.append(basename)
 
-    return torch.tensor(all_preds, dtype=torch.float32), all_attn_weights, all_bag_ids
+    return torch.tensor(all_preds, dtype=torch.float32), all_pool_weights, all_bag_ids

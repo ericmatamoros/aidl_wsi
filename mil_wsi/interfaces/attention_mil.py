@@ -11,8 +11,10 @@ class AttentionMILMLP(nn.Module):
         
         if attention_class == "AttentionMIL":
             self.attention_mil = AttentionMIL(input_size, hidden_size)  # Instancia de atención
-        else:
+        elif attention_class == "MultiHeadAttentionMIL":
             self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)  # Instancia de atención
+        else:
+            raise Exception("Not a valid attention mechanism")
         self.classifier = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),

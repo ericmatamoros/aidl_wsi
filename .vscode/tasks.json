@@ -130,7 +130,7 @@
                 "--suffix_name", "_attention_mil",
             ],
             "problemMatcher": []
-        }
+        },
         {
             "label": "pipeline",
             "type": "shell",

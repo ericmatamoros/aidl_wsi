@@ -8,13 +8,13 @@ from loguru import logger
 
 
 class TransLayer(nn.Module):
-    def __init__(self, norm_layer=nn.LayerNorm, dim=512):
+    def __init__(self, norm_layer=nn.LayerNorm, dim=512, n_heads=8):
         super().__init__()
         self.norm = norm_layer(dim)
         self.attn = NystromAttention(
             dim = dim,
             dim_head = dim // 8,
-            heads = 8,
+            heads = n_heads,
             num_landmarks = dim // 2,    # number of landmarks
             pinv_iterations = 6,         # number of Moore-Penrose iterations for approximating pinverse
             residual = True,             # extra residual connection on the value
@@ -44,7 +44,7 @@ class PPEG(nn.Module):
         return x
 
 class TransMIL(nn.Module):
-    def __init__(self, n_classes, in_dim):
+    def __init__(self, n_classes, n_heads, in_dim):
         super(TransMIL, self).__init__()
         self.in_dim = in_dim
         self.pos_layer = PPEG(dim=in_dim)
@@ -52,8 +52,8 @@ class TransMIL(nn.Module):
         self._fc1 = nn.Sequential(nn.Linear(in_dim, in_dim), nn.ReLU())
         self.cls_token = nn.Parameter(torch.randn(1, 1, in_dim))
         self.n_classes = n_classes
-        self.layer1 = TransLayer(dim=in_dim)
-        self.layer2 = TransLayer(dim=in_dim)
+        self.layer1 = TransLayer(dim=in_dim, n_heads=n_heads)
+        self.layer2 = TransLayer(dim=in_dim, n_heads=n_heads)
         self.norm = nn.LayerNorm(in_dim)
         self._fc2 = nn.Linear(in_dim, self.n_classes)
 
@@ -85,11 +85,11 @@ class TransMIL(nn.Module):
         return results_dict
 
 class TransformerMIL(nn.Module):
-    def __init__(self, input_size, output_size=1):
+    def __init__(self, input_size, n_heads, output_size):
         super().__init__()  # Ensure the parent class is initialized properly
 
         # Define submodules after calling super()
-        self.attention_mil = TransMIL(n_classes=output_size, in_dim=input_size)
+        self.attention_mil = TransMIL(n_classes=output_size, n_heads=n_heads,in_dim=input_size)
         self.classifier = nn.Identity()
 
     def forward(self, x):

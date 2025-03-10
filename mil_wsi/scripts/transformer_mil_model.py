@@ -34,24 +34,27 @@ parser.add_argument('--dir_results', type=str, help='Path to folder containing t
 parser.add_argument('--dir_data', type=str, help='Path containing slides')
 parser.add_argument('--dir_model', type=str, help='Path to store the trained models')
 parser.add_argument('--dir_metrics', type=str, help='Path to store metrics')
+parser.add_argument('--experiment_name', type = str,help='name of the experiment')
 parser.add_argument('--model_name', type=str, default='mil_model', help='Name of the model')
 parser.add_argument('--predictions_name', type=str, default='predictions', help='Name for predictions file')
 parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
-parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MIL network')
 parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
 parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
+parser.add_argument('--n_heads', type=int, default=8, help='Number of heads of the attention')
+parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
+parser.add_argument('--output_size', type=int, default=1, help='Output size')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    input_path = args.dir_results
+    input_path = f"{args.dir_results}/{args.experiment_name}/"
     data_path = args.dir_data
-    model_path = args.dir_model
-    suffix_name = f"TransformerMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
-    metrics_path = f"{args.dir_metrics}/{suffix_name}"
+    model_path = f"{args.dir_model}/{args.experiment_name}/"
+    suffix_name = f"TransformerMIL_bs{args.batch_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_heads{args.n_heads}_os{args.output_size}"
+    metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     os.makedirs(metrics_path, exist_ok=True)
 
     model_name = f"{args.model_name}{suffix_name}"
@@ -89,13 +92,13 @@ if __name__ == '__main__':
 
         input_size = next(iter(train_loader))[0].shape[-1] 
         
-        model = TransformerMIL(input_size=input_size)
+        model = TransformerMIL(input_size=input_size, n_heads = args.n_heads, output_size= args.output_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
         criterion = nn.BCEWithLogitsLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
         
         model, attn_weights = train_transformer_model(model, train_loader, criterion, optimizer, device, args.epochs)
         
