@@ -55,6 +55,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MLP model')
     parser.add_argument('--dir_results', type=str, help='Path to folder containing the results')
     parser.add_argument('--dir_data', type=str, help='Path containing slides')
+    parser.add_argument('--experiment_name', type = str,
+					help='name of the experiment')
     parser.add_argument('--dir_model', type=str, help='Path to store the trained models')
     parser.add_argument('--dir_metrics', type=str, help='Path to store metrics')
     parser.add_argument('--model_name', type=str, default='mlp_model', help='Name of the model')
@@ -62,7 +64,9 @@ if __name__ == '__main__':
     parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--hidden_size', type=float, default=128, help='Hidden size of the MLP network')
+    parser.add_argument('--output_size', type=int, default=1, help='Output size')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
     parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
 
@@ -70,12 +74,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Define directories and create them if they don't exist
-    input_path = args.dir_results
+    input_path = f"{args.dir_results}/{args.experiment_name}/"
     data_path = args.dir_data
-    model_path = args.dir_model
-    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}"
-    metrics_path = f"{args.dir_metrics}/{suffix_name}"
-    loss_graph_path = f"{args.dir_metrics}/{suffix_name}/losses_graphs"
+    model_path = f"{args.dir_model}/{args.experiment_name}/"
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_os{args.output_size}"
+    metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
+    loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
 
     os.makedirs(input_path, exist_ok=True)
     #os.makedirs(data_path, exist_ok=True)
@@ -151,18 +155,19 @@ if __name__ == '__main__':
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         # Instantiate the model for this fold
-        model = MLP(input_size=input_size, hidden_size=args.hidden_size, output_size=1)
+        model = MLP(input_size=input_size, hidden_size=args.hidden_size, output_size=args.output_size)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
         # Set up the loss function and optimizer
         criterion = nn.BCEWithLogitsLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
         n_epochs = args.epochs
 
         # Train the model for this fold
+        num_classes = 2 if args.output_size == 1 else args.output_size
         model, train_losses, val_losses = train_mlp(
-            model, train_loader, val_loader, criterion, optimizer, device, n_epochs
+            model, train_loader, val_loader, optimizer, device, n_epochs, num_classes
         )
 
         # Store training and validation losses for this fold

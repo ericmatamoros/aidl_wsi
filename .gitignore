@@ -9,4 +9,5 @@
 
 # Folders to omit to upload
 *results/
-*data/
+*data/*
+*/data_bracs/*

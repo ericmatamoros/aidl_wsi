@@ -14,14 +14,19 @@ import openslide
 from tqdm import tqdm
 
 import numpy as np
-
-import torch.multiprocessing as mp
-mp.set_start_method('spawn', force=True)
-
+import platform
 
 from mil_wsi.CLAM  import (save_hdf5, Dataset_All_Bags, Whole_Slide_Bag_FP, get_encoder)
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+def get_device():
+    if platform.system() == "Darwin":  # macOS
+        return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    elif torch.cuda.is_available():  # Windows/Linux with CUDA
+        return torch.device("cuda")
+    else:
+        return torch.device("cpu")  # Fallback to CPU
+
+device = torch.device("cpu")
 
 def compute_w_loader(output_path, loader, model, verbose = 0):
 	"""
@@ -52,6 +57,8 @@ def compute_w_loader(output_path, loader, model, verbose = 0):
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
 parser.add_argument('--data_h5_dir', type=str, default=None)
+parser.add_argument('--experiment_name', type = str,
+					help='name of the experiment')
 parser.add_argument('--data_slide_dir', type=str, default=None)
 parser.add_argument('--slide_ext', type=str, default= '.svs')
 parser.add_argument('--csv_path', type=str, default=None)
@@ -60,8 +67,8 @@ parser.add_argument('--model_name', type=str, default='resnet50_trunc', choices=
 parser.add_argument('--batch_size', type=int, default=512)
 parser.add_argument('--no_auto_skip', default=False, action='store_true')
 parser.add_argument('--target_patch_size', type=int, default=224)
+parser.add_argument('--num_workers', type=int, default=8)
 args = parser.parse_args()
-
 
 if __name__ == '__main__':
 	print('initializing dataset')
@@ -69,12 +76,12 @@ if __name__ == '__main__':
 	if csv_path is None:
 		raise NotImplementedError
 
-	bags_dataset = Dataset_All_Bags(csv_path)
+	bags_dataset = Dataset_All_Bags(f"{csv_path}/{args.experiment_name}/process_list_autogen.csv")
 	
 	os.makedirs(args.feat_dir, exist_ok=True)
-	os.makedirs(os.path.join(args.feat_dir, 'pt_files'), exist_ok=True)
-	os.makedirs(os.path.join(args.feat_dir, 'h5_files'), exist_ok=True)
-	dest_files = os.listdir(os.path.join(args.feat_dir, 'pt_files'))
+	os.makedirs(os.path.join(args.feat_dir, f"{args.experiment_name}/", 'pt_files'), exist_ok=True)
+	os.makedirs(os.path.join(args.feat_dir, f"{args.experiment_name}/", 'h5_files'), exist_ok=True)
+	dest_files = os.listdir(os.path.join(args.feat_dir,f"{args.experiment_name}/", 'pt_files'))
 
 	model, img_transforms = get_encoder(args.model_name, target_img_size=args.target_patch_size)
 
@@ -82,21 +89,26 @@ if __name__ == '__main__':
 	model = model.to(device)
 	total = len(bags_dataset)
 
-	loader_kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == "cuda" else {}
+	loader_kwargs = {'num_workers': args.num_workers, 'pin_memory': True} if device.type in ["cuda", "mps"] else {}
+
 
 	for bag_candidate_idx in tqdm(range(total)):
 		slide_id = bags_dataset[bag_candidate_idx].split(args.slide_ext)[0]
 		bag_name = slide_id+'.h5'
-		h5_file_path = os.path.join(args.data_h5_dir, 'patches', bag_name)
+		h5_file_path = os.path.join(args.data_h5_dir, f"{args.experiment_name}/", 'patches', bag_name)
 		slide_file_path = os.path.join(args.data_slide_dir, slide_id+args.slide_ext)
 		print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
 		print(slide_id)
+
+		if not os.path.exists(h5_file_path):
+			print(f'Skipping {slide_id} because {h5_file_path} does not exist')
+			continue
 
 		if not args.no_auto_skip and slide_id+'.pt' in dest_files:
 			print('skipped {}'.format(slide_id))
 			continue 
 
-		output_path = os.path.join(args.feat_dir, 'h5_files', bag_name)
+		output_path = os.path.join(args.feat_dir,  f"{args.experiment_name}/", 'h5_files', bag_name)
 		time_start = time.time()
 		wsi = openslide.open_slide(slide_file_path)
 		dataset = Whole_Slide_Bag_FP(file_path=h5_file_path, 
@@ -116,7 +128,7 @@ if __name__ == '__main__':
 
 		features = torch.from_numpy(features)
 		bag_base, _ = os.path.splitext(bag_name)
-		torch.save(features, os.path.join(args.feat_dir, 'pt_files', bag_base+'.pt'))
+		torch.save(features, os.path.join(args.feat_dir,  f"{args.experiment_name}/", 'pt_files', bag_base+'.pt'))
 
 
 

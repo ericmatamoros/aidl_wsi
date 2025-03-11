@@ -28,11 +28,12 @@
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2"
             },
             "args": [
-                "--source", "./mil_wsi/data",
-                "--save_dir", "./mil_wsi/data/results/",
+                "--source", "./mil_wsi/data_bracs",
+                "--save_dir", "./mil_wsi/results/",
                 "--patch_size", "256",
                 "--patch",
-                "--stitch"
+                "--stitch",
+                "--experiment_name", "bracs",
             ]
         },
         {
@@ -129,8 +130,20 @@
             "args": [
                 "--dir_results", "./mil_wsi/results/",
                 "--dir_data", "./mil_wsi/data/",
-                "--dir_model", "./mil_wsi/models/",
-                "--dir_metrics", "./mil_wsi/metrics/"
+            ]
+        },
+        {
+            "name": "tasks",
+            "type": "python",
+            "request": "launch",
+            "module": "mil_wsi.tasks",
+            "console": "internalConsole",
+            "subProcess": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [
             ]
         }
     ]

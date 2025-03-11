@@ -16,3 +16,4 @@ tensorboardX
 loguru
 umap-learn
 NystromAttention
+openpyxl

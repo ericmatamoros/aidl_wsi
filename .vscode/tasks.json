@@ -126,7 +126,7 @@
                 "--dir_metrics", "./mil_wsi/metrics/",
             ],
             "problemMatcher": []
-        }
+        },
         {
             "label": "pipeline",
             "type": "shell",

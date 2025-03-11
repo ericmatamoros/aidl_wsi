@@ -1,21 +1,54 @@
 import os
+import yaml
 import subprocess
+import sys
+
+from mil_wsi import CONFIG_PATH
 
 def run_task(command, env_vars=None):
-    """Runs a shell command with optional environment variables."""
+    """Runs a shell command with optional environment variables and prints logs in real-time."""
     env = {**os.environ, **(env_vars or {})}  # Merge with existing environment
-    subprocess.run(command, shell=True, env=env, check=True)
+
+    process = subprocess.Popen(
+        command, shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+
+    # Print logs in real-time
+    for line in process.stdout:
+        sys.stdout.write(line)  # Print without adding extra newlines
+        sys.stdout.flush()  # Ensure real-time output
+
+    for line in process.stderr:
+        sys.stderr.write(line)  # Print errors to stderr
+        sys.stderr.flush()
+
+    process.wait()  # Wait for process to finish
+
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, command)
 
 def main():
+
+    with open(f"{CONFIG_PATH}/config.yaml", "r") as file:
+        settings = yaml.safe_load(file)
+    
+    create_patch_settings = settings['create_patches']
+    feat_extract_settings = settings['feature_extraction']
+    model_conf_settings = settings['model_configuration']
+
+    data_path = "./mil_wsi/data_bracs/"
+    results_path = "./mil_wsi/results/"
+    metrics_path = "./mil_wsi/metrics/"
+    models_path = "./mil_wsi/models/"
+
     tasks = {
-        "1": ("Convert to PNG", "conda run -n wsi python -m mil_wsi.scripts.convert_to_png --source ./mil_wsi/data --save_dir ./mil_wsi/data/images/ --file_extension svs"),
-        "2": ("Create Patches", "conda run -n wsi python -m mil_wsi.scripts.create_patches --source ./mil_wsi/data --save_dir ./mil_wsi/results/ --patch_size 2856 --seg --patch --stitch"),
-        "3": ("Extract Features", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.extract_features --data_h5_dir ./mil_wsi/results/ --data_slide_dir ./mil_wsi/data/ --csv_path ./mil_wsi/results/process_list_autogen.csv --feat_dir ./mil_wsi/results/ --model_name conch_v1 --batch_size 512 --slide_ext .svs"),
-        "4": ("MLP Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "6": ("Weighted Model", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.weighted_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "7": ("Attention MIL", "conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.attention_mil_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "8": ("Transformer MIL", "conda run -n wsi python -m mil_wsi.scripts.transformer_mil_model --dir_results ./mil_wsi/results/ --dir_data ./mil_wsi/data/ --dir_model ./mil_wsi/models/ --dir_metrics ./mil_wsi/metrics/"),
-        "9": ("Run Full Pipeline", ""),
+        "1": ("Create Patches", f"conda run -n wsi python -m mil_wsi.scripts.create_patches --source {data_path} --save_dir {results_path} --patch_size {create_patch_settings['patch_size']} --step_size {create_patch_settings['step_size']} --seg --patch --stitch --experiment_name {settings['experiment_name']}"),
+        "2": ("Extract Features", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.extract_features --data_h5_dir {results_path} --data_slide_dir {data_path} --csv_path {results_path} --feat_dir {results_path} --model_name {feat_extract_settings['model_name']} --batch_size {feat_extract_settings['batch_size']} --slide_ext {feat_extract_settings['slide_ext']} --experiment_name {settings['experiment_name']}"),
+        "3": ("MLP Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results {results_path}--dir_data {data_path}/ --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --output_size {model_conf_settings['output_size']} --experiment_name {settings['experiment_name']}"),
+        "4": ("Weighted Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.weighted_model --dir_results {results_path}--dir_data {data_path}/ --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --output_size {model_conf_settings['output_size']} --experiment_name {settings['experiment_name']}"),
+        "5": ("Attention MIL", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.attention_mil_model --dir_results {results_path}--dir_data {data_path}/ --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --attention_class {model_conf_settings['attention_class']} --n_heads {model_conf_settings['n_heads']} --output_size {model_conf_settings['output_size']} --experiment_name {settings['experiment_name']}"),
+        "6": ("Transformer MIL", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.transformer_mil_model --dir_results {results_path}--dir_data {data_path}/ --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --n_heads {model_conf_settings['n_heads']} --output_size {model_conf_settings['output_size']} --experiment_name {settings['experiment_name']}"),
+        "7": ("Run Full Pipeline", ""),
     }
     
     print("Select a task to run:")
@@ -27,8 +60,8 @@ def main():
     if choice in tasks:
         name, command = tasks[choice]
         print(f"Running: {name}\n")
-        if choice == "9":  # Full pipeline
-            for task_key in ["2", "3", "4", "5", "6", "7", "8"]:
+        if choice == "7":  # Full pipeline
+            for task_key in ["1", "2", "3", "4", "5", "6"]:
                 print(f"Executing: {tasks[task_key][0]}")
                 run_task(tasks[task_key][1])
         else:

@@ -1,4 +1,25 @@
 # Configuration
 
-experiment_name: 'prova'
-batch_size : [512, 1024]
+# Main
+experiment_name: 'bracs'
+
+create_patches:
+  patch_size: 256
+  step_size: 256
+
+feature_extraction:
+  model_name: uni_v1
+  batch_size: 512
+  slide_ext: .svs
+
+
+model_configuration:
+  batch_size: 1
+  hidden_size: 128
+  epochs: 5
+  test_size: 0.3
+  k_folds: 5
+  n_heads: 8
+  output_size: 1
+  learning_rate: 0.001
+  attention_class: AttentionMIL

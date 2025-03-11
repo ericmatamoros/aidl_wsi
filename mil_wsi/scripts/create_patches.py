@@ -102,8 +102,8 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 	slides = sorted(os.listdir(source))
 	slides = [slide for slide in slides if os.path.isfile(os.path.join(source, slide))]
-	slides = [slide for slide in slides if  'git' not in slide]
-	slides = [slide for slide in slides if  'csv' not in slide]
+	slides = [slide for slide in slides if all(ext not in slide for ext in ['git', 'csv', 'xlsx', '.DS_Store'])] # TO BE IMPROVED
+
 	if process_list is None:
 		df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params)
 	
@@ -290,6 +290,8 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 parser = argparse.ArgumentParser(description='seg and patch')
 parser.add_argument('--source', type = str,
 					help='path to folder containing raw wsi image files')
+parser.add_argument('--experiment_name', type = str,
+					help='name of the experiment')
 parser.add_argument('--step_size', type = int, default=256,
 					help='step_size')
 parser.add_argument('--patch_size', type = int, default=256,
@@ -311,10 +313,10 @@ parser.add_argument('--process_list',  type = str, default=None,
 if __name__ == '__main__':
 	args = parser.parse_args()
 
-	patch_save_dir = os.path.join(args.save_dir, 'patches')
-	mask_save_dir = os.path.join(args.save_dir, 'masks')
-	stitch_save_dir = os.path.join(args.save_dir, 'stitches')
-	mask_on_patch_save_dir = os.path.join(args.save_dir, 'patches_on_mask')
+	patch_save_dir = os.path.join(args.save_dir, f"{args.experiment_name}/", 'patches')
+	mask_save_dir = os.path.join(args.save_dir, f"{args.experiment_name}/", 'masks')
+	stitch_save_dir = os.path.join(args.save_dir, f"{args.experiment_name}/", 'stitches')
+	mask_on_patch_save_dir = os.path.join(args.save_dir, f"{args.experiment_name}/", 'patches_on_mask')
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
@@ -329,7 +331,7 @@ if __name__ == '__main__':
 	print('mask_on_patch: ', mask_on_patch_save_dir)
 	
 	directories = {'source': args.source, 
-				   'save_dir': args.save_dir,
+				   'save_dir': os.path.join(args.save_dir, f"{args.experiment_name}/"),
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
 				   'stitch_save_dir': stitch_save_dir,
