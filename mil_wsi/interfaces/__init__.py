@@ -33,7 +33,7 @@ from .attention_mil import(
     predict_attention_mil,
 )
 
-from .transformer_mil import (
+from .transformer_mil_adapted import (
     TransformerMIL,
     train_transformer_model,
     predict_transformer_model

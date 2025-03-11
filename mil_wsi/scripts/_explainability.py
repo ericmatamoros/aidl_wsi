@@ -23,13 +23,15 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
     os.makedirs(explainability_dir, exist_ok=True)
     print(all_filenames)
 
+    print("do we enter the place?")
     for i, (attn_weights, wsi_name) in enumerate(zip(all_attn_weights, all_filenames)):
         print(attn_weights)
         wsi_img_path = os.path.join(f"{data_path}images/", f"{wsi_name}.svs")
         mask_img_path = os.path.join(f"{data_path}patches/masks/", f"{wsi_name}.jpg")
         h5_patch_path = os.path.join(f"{data_path}patches/patches/", f"{wsi_name}.h5")
-
+        print(i)
         if os.path.exists(mask_img_path) and os.path.exists(h5_patch_path) and os.path.exists(wsi_img_path):  # Ensure WSI, patches and masks exist
+            print("we enter the place")
             mask_img = plt.imread(mask_img_path)  # Load WSI image
 
             # Load patch coordinates from the .h5 file

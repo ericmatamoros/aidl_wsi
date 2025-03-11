@@ -43,7 +43,7 @@ parser.add_argument('--metrics_name', type=str, default='metrics', help='Name fo
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
 parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MIL network')
 parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
-parser.add_argument('--epochs', type=int, default=6, help='Number of epochs to train')
+parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
 
