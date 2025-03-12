@@ -21,6 +21,7 @@ from mil_wsi.interfaces import (
     predict_transformer_model, 
     MILBagDataset, 
     TransformerMIL,
+    TransformerMarugoto
 )
 
 from ._explainability import visualize_attention
@@ -41,7 +42,7 @@ parser.add_argument('--metrics_name', type=str, default='metrics', help='Name fo
 parser.add_argument('--batch_size', type=int, default=1, help='Size of the batch (1 for MIL)')
 parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
 parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
-parser.add_argument('--n_heads', type=int, default=8, help='Number of heads of the attention')
+parser.add_argument('--n_heads', type=int, default=4, help='Number of heads of the attention')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--output_size', type=int, default=1, help='Output size')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
@@ -61,13 +62,13 @@ if __name__ == '__main__':
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
-    files_pt = os.listdir(f"{input_path}/pt_files_conch")
+    files_pt = os.listdir(f"{args.dir_results}/pt_files_conch")
 
     logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
 
-    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files_conch"), target)
+    dataset = MILBagDataset(input_path, os.listdir(f"{args.dir_results}/pt_files_conch"), target)
     targets = [dataset[i][1] for i in range(len(dataset))]
     
     # Split dataset into train and test
@@ -92,7 +93,8 @@ if __name__ == '__main__':
 
         input_size = next(iter(train_loader))[0].shape[-1] 
         
-        model = TransformerMIL(input_size=input_size, n_heads = args.n_heads, output_size= args.output_size)
+        #model = TransformerMIL(input_size=input_size, n_heads = args.n_heads, num_classes= args.output_size)
+        model = TransformerMarugoto(input_size=input_size, n_heads = args.n_heads, num_classes= args.output_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -100,46 +102,21 @@ if __name__ == '__main__':
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
         
-        model, _ = train_transformer_model(model, train_loader, criterion, optimizer, device, args.epochs)
+        model, attn_weights = train_transformer_model(model, train_loader, criterion, optimizer, device, args.epochs)
         
         logger.info("Performing validation predictions")
-        predictions, _, bag_ids = predict_transformer_model(model, val_loader, device, test=False)
+        predictions, attn_weights, bag_ids = predict_transformer_model(model, val_loader, device)
         predictions = predictions.cpu().numpy().round().astype(int)
+        
         fold_metrics = compute_metrics(predictions, [y for _, y, _ in val_dataset])
         all_metrics.append(fold_metrics)
         
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
     
-    # final_metrics = {
-    #     key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
-    #     for key in all_metrics[0].keys()
-    # }
-    # with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
-    #     json.dump(final_metrics, json_file, indent=4)
-
-    # logger.info("Evaluating on final test set")
-    # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
-
-    # model.eval()
-    
-    # predictions, attn_weights, bag_ids = predict_transformer_model(model, test_loader, device, test=True)
-    # predictions = predictions.cpu().numpy().round().astype(int)
-
-    # visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
-
-    # preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
-    # preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
-
-    # metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
-    # with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
-    #     json.dump(metrics, json_file, indent=4)
-
-    # logger.info("K-Fold Cross-Validation Completed")
-
     final_metrics = {
-    key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
-    for key in all_metrics[0].keys()
+        key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
+        for key in all_metrics[0].keys()
     }
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
         json.dump(final_metrics, json_file, indent=4)
@@ -148,28 +125,15 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model.eval()
-
-    predictions, attn_weights, bag_ids = predict_transformer_model(model, test_loader, device, test=True)
+    predictions, attn_weights, bag_ids = predict_transformer_model(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
     visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
 
-    # Convert predictions to a DataFrame and save to CSV
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
-    # Compute metrics and convert confusion matrix to a serializable format
     metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
-
-    # Convert confusion matrix DataFrame to dictionary
-    if isinstance(metrics['confusion_matrix'], pd.DataFrame):
-        metrics['confusion_matrix'] = {
-            f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
-            for i in range(metrics['confusion_matrix'].shape[0])
-            for j in range(metrics['confusion_matrix'].shape[1])
-        }
-
-    # Save metrics as JSON
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 

@@ -33,8 +33,14 @@ from .attention_mil import(
     predict_attention_mil,
 )
 
-from .transformer_mil_adapted import (
+from .transformer_mil import (
     TransformerMIL,
+    train_transformer_model,
+    predict_transformer_model
+)
+
+from .transformer_marugoto import (
+    TransformerMarugoto,
     train_transformer_model,
     predict_transformer_model
 )
@@ -56,6 +62,7 @@ __all__: list[str] = [
     "train_attention_mil",
     "predict_attention_mil",
     "TransformerMIL",
+    "TransformerMarugoto",
     "train_transformer_model",
     "predict_transformer_model"
 ]
