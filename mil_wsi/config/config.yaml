@@ -20,6 +20,5 @@ model_configuration:
   test_size: 0.3
   k_folds: 5
   n_heads: 8
-  output_size: 1
   learning_rate: 0.001
   attention_class: AttentionMIL

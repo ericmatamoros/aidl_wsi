@@ -63,8 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--predictions_name', type=str, default='predictions', help='Name for predictions file')
     parser.add_argument('--metrics_name', type=str, default='metrics', help='Name for metrics file')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
-    parser.add_argument('--hidden_size', type=float, default=128, help='Hidden size of the MLP network')
-    parser.add_argument('--output_size', type=int, default=1, help='Output size')
+    parser.add_argument('--hidden_size', type=int, default=128, help='Hidden size of the MLP network')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
@@ -77,7 +76,7 @@ if __name__ == '__main__':
     input_path = f"{args.dir_results}/{args.experiment_name}/"
     data_path = args.dir_data
     model_path = f"{args.dir_model}/{args.experiment_name}/"
-    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_os{args.output_size}"
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
 
@@ -108,9 +107,10 @@ if __name__ == '__main__':
     df = load_data(input_path, files_pt, target)
 
     # Separate features and target
-    features = df.drop(columns=['filename', 'target'])
+    features = df.iloc[:, 0:args.batch_size]
     input_size = features.shape[1]
     target = df['target']
+    num_classes = len(np.unique(target))
 
     # Split data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
@@ -153,7 +153,8 @@ if __name__ == '__main__':
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         # Instantiate the model for this fold
-        model = MLP(input_size=input_size, hidden_size=args.hidden_size, output_size=args.output_size)
+        output_size = 1 if num_classes == 2 else num_classes
+        model = MLP(input_size=input_size, hidden_size=args.hidden_size, output_size=output_size)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
@@ -163,7 +164,6 @@ if __name__ == '__main__':
         n_epochs = args.epochs
 
         # Train the model for this fold
-        num_classes = 2 if args.output_size == 1 else args.output_size
         model, train_losses, val_losses = train_mlp(
             model, train_loader, val_loader, optimizer, device, n_epochs, num_classes
         )
@@ -174,7 +174,7 @@ if __name__ == '__main__':
 
         # Evaluate on the validation set for this fold
         model.eval()
-        predictions = predict_mlp(model, val_loader, device).cpu().numpy()
+        predictions = predict_mlp(model, val_loader, device, num_classes).cpu().numpy()
         predictions = predictions.round().astype(int)
         all_predictions.append(predictions)
 
@@ -183,7 +183,7 @@ if __name__ == '__main__':
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
 
         # Calculate and store metrics for this fold
-        fold_metrics = compute_metrics(predictions, y_val_fold)
+        fold_metrics = compute_metrics(predictions, y_val_fold, num_classes)
         all_metrics.append(fold_metrics)
 
     # Average validation metrics across folds
@@ -210,16 +210,16 @@ if __name__ == '__main__':
 
     model.eval()
     logger.info("Performing predictions using MLP model")
-    predictions = predict_mlp(model, test_loader, device)
+    predictions = predict_mlp(model, test_loader, device, num_classes)
     predictions = predictions.cpu().numpy()
     predictions = predictions.round().astype(int)
 
     # Save test set predictions to CSV
-    preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': y_test})
+    preds = pd.DataFrame({'y_pred': predictions, 'y_true': y_test})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
     logger.info("Computing classification metrics")
-    metrics = compute_metrics(predictions, y_test)
+    metrics = compute_metrics(predictions, y_test, num_classes)
     metrics['confusion_matrix'] = {
         f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
         for i in range(metrics['confusion_matrix'].shape[0])

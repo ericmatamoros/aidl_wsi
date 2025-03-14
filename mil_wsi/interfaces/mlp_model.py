@@ -121,7 +121,7 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
 
 
 
-def predict_mlp(model, test_loader, device: torch.device, num_classes=2, threshold=0.5):
+def predict_mlp(model, test_loader, device: torch.device, num_classes: int, threshold=0.5):
     model.eval()
     all_preds = []
 
