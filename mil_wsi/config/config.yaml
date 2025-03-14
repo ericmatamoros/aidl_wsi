@@ -1,7 +1,7 @@
 # Configuration
 
 # Main
-experiment_name: 'bracs'
+experiment_name: 'normal'
 
 create_patches:
   patch_size: 256
@@ -16,9 +16,9 @@ feature_extraction:
 model_configuration:
   batch_size: 1
   hidden_size: 128
-  epochs: 5
-  test_size: 0.3
-  k_folds: 5
+  epochs: 100
+  test_size: 0.1
+  k_folds: 4
   n_heads: 8
   learning_rate: 0.001
   attention_class: AttentionMIL

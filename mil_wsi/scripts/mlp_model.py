@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     # Define directories and create them if they don't exist
     input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = args.dir_data
+    data_path = f"{args.dir_data}/{args.experiment_name}/"
     model_path = f"{args.dir_model}/{args.experiment_name}/"
     suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     logger.info("Reading data and generating data loaders")
     # Read target CSV file
-    target = pd.read_csv(f"{data_path}/target.csv")
+    target = pd.read_csv(f"{data_path}target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
     # Uncomment the following line to invert target values if needed (positive class = 1)
     # target['target'] = 1 - target['target']
@@ -200,8 +200,8 @@ if __name__ == '__main__':
     logger.info("K-Fold Cross-Validation Completed")
 
     # Plot training and validation loss graphs
-    plot_loss(train_losses_total, loss_graph_path, suffix_name, "train")
-    plot_loss(val_losses_total, loss_graph_path, suffix_name, "val")
+    plot_loss(train_losses_total, loss_graph_path, suffix_name, "Train")
+    plot_loss(val_losses_total, loss_graph_path, suffix_name, "Validation")
 
     # Evaluation on the test set using the model from the last fold
     logger.info("Evaluating on final test set")

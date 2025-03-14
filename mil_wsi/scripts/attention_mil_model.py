@@ -57,11 +57,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = args.dir_data
+    data_path = f"{args.dir_data}/{args.experiment_name}/"
     model_path = f"{args.dir_model}/{args.experiment_name}/"
     suffix_name = f"AttentionMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_heads{args.n_heads}_os{args.output_size}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
+    loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
+
+    print(f"input_path: {input_path}")
+    print(f"data_path: {data_path}")
+    print(f"metrics_path: {metrics_path}")
+
     os.makedirs(metrics_path, exist_ok=True)
+    os.makedirs(loss_graph_path, exist_ok=True)
 
     model_name = f"{args.model_name}{suffix_name}"
     predictions_name = f"{args.predictions_name}{suffix_name}"
@@ -110,8 +117,10 @@ if __name__ == '__main__':
         criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
         
-        model, attn_weights = train_attention_mil(model, train_loader,  criterion, optimizer, device, args.epochs)
-        
+        model, attn_weights, train_losses, train_acuracy = train_attention_mil(model, train_loader,  criterion, optimizer, device, args.epochs)
+        # Store training and validation losses for this fold
+        train_losses_total.append(train_losses)
+
         logger.info("Performing validation predictions")
         predictions, attn_weights, bag_ids = predict_attention_mil(model, val_loader, device)
         predictions = predictions.cpu().numpy().round().astype(int)
@@ -129,12 +138,13 @@ if __name__ == '__main__':
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
         json.dump(final_metrics, json_file, indent=4)
 
-    logger.info("Evaluating on final test set")
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
-    
     # Plot training and validation loss graphs
     plot_loss(val_losses_total, loss_graph_path, suffix_name, "val")
 
+
+    logger.info("Evaluating on final test set")
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    
     model.eval()
     predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)

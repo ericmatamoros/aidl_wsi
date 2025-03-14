@@ -80,8 +80,10 @@ def train_attention_mil(model, train_loader, criterion, optimizer, device, epoch
     model.train()
     model.to(device)
 
+    train_losses = []  # Lista para almacenar la loss de cada época
+    train_accuracy = []
     for epoch in range(epochs):
-        total_loss = 0.0
+        running_loss = 0.0
         correct = 0
         total = 0
 
@@ -96,15 +98,19 @@ def train_attention_mil(model, train_loader, criterion, optimizer, device, epoch
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item()
+            running_loss += loss.item()
             preds = (torch.sigmoid(outputs) > 0.5).float()
             correct += (preds == labels).sum().item()
             total += labels.size(0)
 
-        accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss:.4f}, Accuracy: {accuracy:.4f}")
 
-    return model, attn_weights
+        avg_train_loss = running_loss / len(train_loader)  # Promedio de la pérdida por minibatch
+        train_losses.append(avg_train_loss)  # Guardar la pérdida de la época
+        accuracy = correct / total
+        train_accuracy.append(accuracy)
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_train_loss:.4f}, Accuracy: {accuracy:.4f}")
+
+    return model, attn_weights, train_losses, train_accuracy
 
 def predict_attention_mil(model, test_loader, device):
     model.eval()
