@@ -1,6 +1,6 @@
 # Configuration
 
-data_path: "./mil_wsi/data_bracs/"
+data_path: "./mil_wsi/data/"
 results_path: "./mil_wsi/results/"
 metrics_path: "./mil_wsi/metrics/"
 models_path: "./mil_wsi/models/"
