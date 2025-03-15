@@ -6,7 +6,7 @@ import h5py
 from openslide import OpenSlide
 
 
-def visualize_attention(all_attn_weights, all_filenames, predictions, data_path, files_h5_path, masks_path, suffix, threshold=0.5, patch_size=257):
+def visualize_attention(all_attn_weights, all_filenames, predictions, data_path, files_h5_path, masks_path, suffix, threshold=0.5, patch_size=257, transformerMIL=False):
     """
     Save WSI images with highlighted patches based on attention scores.
 
@@ -40,7 +40,16 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
             with h5py.File(file_h5_path, "r") as f:
                 patches = f["coords"][:]
 
-            attn_scores = attn_weights[0].flatten()
+            if transformerMIL:
+                # Average over attention heads and batch
+                attn_scores = attn_weights.mean(dim=(0, 1))
+
+                # Extract a single attention score per patch (e.g., average over columns)
+                attn_scores = attn_scores.mean(dim=1)
+                print(f"Shape of attn_scores: {attn_scores.shape}")
+                print(f"Shape of patches: {patches.shape}")
+            else:
+                attn_scores = attn_weights[0].flatten()
 
             # Plot histogram before normalization
             plt.figure(figsize=(10, 4))
@@ -51,7 +60,7 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
             plt.legend()
             plt.savefig(os.path.join(explainability_dir, f"{wsi_name}_hist_before.jpg"), bbox_inches="tight", dpi=300)
             plt.close()
-
+                  
             # Evitar que todo sea 0 si la variabilidad es baja
             min_val, max_val = np.percentile(attn_scores, 1), np.percentile(attn_scores, 99)  # Recortar valores extremos inferiores
 
