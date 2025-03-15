@@ -20,8 +20,6 @@ from mil_wsi.interfaces import (
     train_attention_mil, 
     predict_attention_mil, 
     MILBagDataset, 
-    AttentionMIL,
-    MultiHeadAttention,
     AttentionMILMLP,
     plot_loss
 )
@@ -30,7 +28,6 @@ from ._explainability import visualize_attention
 
 import warnings
 warnings.filterwarnings("ignore")
-
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='Attention MIL model with K-Fold Cross-Validation')
@@ -48,7 +45,6 @@ parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
 parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--n_heads', type=int, default=8, help='Number of heads of the attention')
-parser.add_argument('--output_size', type=int, default=1, help='Output size')
 parser.add_argument('--k_folds', type=int, default=4, help='Number of K-fold splits')
 parser.add_argument('--attention_class', type=str, default="AttentionMIL", help='Either AttentionMIL or MultiHeadAttentionMIL')
 parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Threshold for highlighting patches in WSI')
@@ -57,15 +53,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = f"{args.dir_data}/{args.experiment_name}/"
+    data_path = f"{args.dir_data}/"
     model_path = f"{args.dir_model}/{args.experiment_name}/"
-    suffix_name = f"AttentionMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_heads{args.n_heads}_os{args.output_size}"
+    suffix_name = f"AttentionMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_heads{args.n_heads}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
 
-    print(f"input_path: {input_path}")
-    print(f"data_path: {data_path}")
-    print(f"metrics_path: {metrics_path}")
+    logger.info(f"input_path: {input_path}")
+    logger.info(f"data_path: {data_path}")
+    logger.info(f"metrics_path: {metrics_path}")
 
     os.makedirs(metrics_path, exist_ok=True)
     os.makedirs(loss_graph_path, exist_ok=True)
@@ -79,6 +75,7 @@ if __name__ == '__main__':
     logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
+    num_classes = len(np.unique(target['target'].values))
 
     dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
     targets = [dataset[i][1] for i in range(len(dataset))]
@@ -106,26 +103,28 @@ if __name__ == '__main__':
         val_dataset = torch.utils.data.Subset(dataset, val_idx)
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        output_size = 1 if num_classes == 2 else num_classes
 
         input_size = next(iter(train_loader))[0].shape[-1]
-
-        model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="AttentionMIL", n_heads = args.n_heads, output_size=args.output_size)
+        model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="AttentionMIL", n_heads = args.n_heads, output_size=output_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
-        criterion = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
         
-        model, attn_weights, train_losses, train_acuracy = train_attention_mil(model, train_loader,  criterion, optimizer, device, args.epochs)
+        model, train_losses, val_losses = train_attention_mil(model, train_loader, val_loader, optimizer, device, args.epochs, num_classes)
+         
         # Store training and validation losses for this fold
         train_losses_total.append(train_losses)
+        val_losses_total.append(val_losses)
 
         logger.info("Performing validation predictions")
-        predictions, attn_weights, bag_ids = predict_attention_mil(model, val_loader, device)
+        predictions, attn_weights, bag_ids = predict_attention_mil(model, val_loader, device, num_classes)
         predictions = predictions.cpu().numpy().round().astype(int)
+        all_predictions.append(predictions)
         
-        fold_metrics = compute_metrics(predictions, [y for _, y, _ in val_dataset])
+        fold_metrics = compute_metrics(predictions, [y for _, y, _ in val_dataset], num_classes)
         all_metrics.append(fold_metrics)
         
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
@@ -139,14 +138,14 @@ if __name__ == '__main__':
         json.dump(final_metrics, json_file, indent=4)
 
     # Plot training and validation loss graphs
-    plot_loss(val_losses_total, loss_graph_path, suffix_name, "val")
-
+    plot_loss(train_losses_total, loss_graph_path, suffix_name, "Train")
+    plot_loss(val_losses_total, loss_graph_path, suffix_name, "Validation")
 
     logger.info("Evaluating on final test set")
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     
     model.eval()
-    predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device)
+    predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device, num_classes)
     predictions = predictions.cpu().numpy().round().astype(int)
 
     visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
@@ -154,7 +153,7 @@ if __name__ == '__main__':
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
-    metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
+    metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset], num_classes)
     metrics['confusion_matrix'] = {
         f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
         for i in range(metrics['confusion_matrix'].shape[0])

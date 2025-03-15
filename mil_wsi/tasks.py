@@ -36,10 +36,10 @@ def main():
     feat_extract_settings = settings['feature_extraction']
     model_conf_settings = settings['model_configuration']
 
-    data_path = "./mil_wsi/data/"
-    results_path = "./mil_wsi/results/"
-    metrics_path = "./mil_wsi/metrics/"
-    models_path = "./mil_wsi/models/"
+    data_path = settings['data_path']
+    results_path = settings['results_path']
+    metrics_path = settings['metrics_path']
+    models_path = settings['models_path']
 
     tasks = {
         "1": ("Create Patches", f"conda run -n wsi python -m mil_wsi.scripts.create_patches --source {data_path} --save_dir {results_path} --patch_size {create_patch_settings['patch_size']} --step_size {create_patch_settings['step_size']} --seg --patch --stitch --experiment_name {settings['experiment_name']}"),

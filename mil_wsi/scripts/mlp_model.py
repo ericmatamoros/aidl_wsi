@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     # Define directories and create them if they don't exist
     input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = f"{args.dir_data}/{args.experiment_name}/"
+    data_path = f"{args.dir_data}/"
     model_path = f"{args.dir_model}/{args.experiment_name}/"
     suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
@@ -99,9 +99,9 @@ if __name__ == '__main__':
     # Uncomment the following line to invert target values if needed (positive class = 1)
     # target['target'] = 1 - target['target']
     target_counts = target['target'].value_counts()
-    print("Target Value Distribution:")
+    logger.info("Target Value Distribution:")
     for value, count in target_counts.items():
-        print(f"Value {value}: {count} instances")
+        logger.info(f"Value {value}: {count} instances")
 
     # Load data from .pt files and merge with target
     df = load_data(input_path, files_pt, target)
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     with open(f"{metrics_path}/{metrics_name}_kfold.json", 'w') as json_file:
         json.dump(final_metrics, json_file, indent=4)
 
-    print(f"Saving final averaged validation metrics to: {metrics_path}/{metrics_name}_kfold.json")
+    logger.info(f"Saving final averaged validation metrics to: {metrics_path}/{metrics_name}_kfold.json")
     logger.info("K-Fold Cross-Validation Completed")
 
     # Plot training and validation loss graphs
@@ -228,5 +228,5 @@ if __name__ == '__main__':
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 
-    print(f"Saving predictions to: {metrics_path}/{predictions_name}_test.csv")
-    print(f"Saving metrics to: {metrics_path}/{metrics_name}_test.json")
+    logger.info(f"Saving predictions to: {metrics_path}/{predictions_name}_test.csv")
+    logger.info(f"Saving metrics to: {metrics_path}/{metrics_name}_test.json")
