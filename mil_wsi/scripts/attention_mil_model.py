@@ -130,6 +130,7 @@ if __name__ == '__main__':
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
     
+    torch.save(model, f"{model_path}/{suffix_name}.pth")
     final_metrics = {
         key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
         for key in all_metrics[0].keys()
