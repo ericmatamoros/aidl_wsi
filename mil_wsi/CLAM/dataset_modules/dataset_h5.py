@@ -4,6 +4,8 @@ import pandas as pd
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import openslide
+
 from PIL import Image
 import h5py
 
@@ -87,6 +89,40 @@ class Whole_Slide_Bag_FP(Dataset):
 
 		img = self.roi_transforms(img)
 		return {'img': img, 'coord': coord}
+	
+
+
+class Whole_Slide_Bag_Get_FP(Dataset):
+    def __init__(self, file_path, slide_path, img_transforms=None):
+        """
+        Args:
+            file_path (string): Path to the .h5 file containing patched data.
+            slide_path (string): Path to the WSI file.
+            img_transforms (callable, optional): Optional transform to be applied on a sample.
+        """
+        self.slide_path = slide_path  # Store path instead of OpenSlide object
+        self.roi_transforms = img_transforms
+        self.file_path = file_path
+
+        with h5py.File(self.file_path, "r") as f:
+            dset = f["coords"]
+            self.patch_level = f["coords"].attrs["patch_level"]
+            self.patch_size = f["coords"].attrs["patch_size"]
+            self.length = len(dset)
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        with h5py.File(self.file_path, "r") as hdf5_file:
+            coord = hdf5_file["coords"][idx]
+
+        # ✅ Open OpenSlide inside __getitem__, not in __init__
+        with openslide.OpenSlide(self.slide_path) as wsi:
+            img = wsi.read_region(coord, self.patch_level, (self.patch_size, self.patch_size)).convert("RGB")
+
+        img = self.roi_transforms(img)
+        return {"img": img, "coord": coord}
 
 class Dataset_All_Bags(Dataset):
 

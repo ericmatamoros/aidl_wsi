@@ -153,7 +153,7 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), best_model_path )
             logger.info(f"Nuevo mejor modelo guardado para Fold {fold + 1} con F1 Score: {best_val_metric}")
 
-
+    torch.save(model, f"{model_path}/{suffix_name}.pth")
 
     final_metrics = {
         key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
