@@ -22,9 +22,15 @@ class TransLayer(nn.Module):
         )
 
     def forward(self, x):
-        x = x + self.attn(self.norm(x))
-        return x
+        attn_result = None
+        if not self.training:
+            output, attn_result = self.attn(self.norm(x), return_attn=True)  # Extract attention weights. Only return attention weights if not training.
+        else:
+            output = self.attn(self.norm(x))  # Extract attention weights. Only return attention weights if not training.
 
+        x = x + output
+        return x, attn_result
+    
 class PPEG(nn.Module):
     def __init__(self, dim):
         super(PPEG, self).__init__()
@@ -72,9 +78,9 @@ class TransMIL(nn.Module):
         cls_tokens = self.cls_token.expand(B, -1, -1).to(h.device)
         h = torch.cat((cls_tokens, h), dim=1)  # [B, 1+N, 512]
 
-        h = self.layer1(h)
+        h, attn_weights1 = self.layer1(h)
         h = self.pos_layer(h, _H, _W)
-        h = self.layer2(h)
+        h, attn_weights2 = self.layer2(h)
 
         # Use the class token for prediction.
         h = self.norm(h)[:, 0]
@@ -82,6 +88,13 @@ class TransMIL(nn.Module):
         Y_hat = torch.argmax(logits, dim=1)
         Y_prob = F.softmax(logits, dim=1)
         results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
+
+        results_dict['attn_weights'] = None
+        if not self.training:  # Only store attention weights during inference
+            # Slice attention weights to exclude class token and padding
+            attn_weights2 = attn_weights2[:, :, 1:H+1, 1:H+1]  # Shape: [B, heads, H, H]
+            results_dict['attn_weights'] = attn_weights2  # Return only the second layer's attention weights, since they are generally more high-level and expressive
+
         return results_dict
 
 class TransformerMIL(nn.Module):
@@ -93,8 +106,14 @@ class TransformerMIL(nn.Module):
         self.classifier = nn.Identity()
 
     def forward(self, x):
-        logits = self.attention_mil(data=x)['logits']
-        return logits, None
+        output_dict = self.attention_mil(data=x)
+        logits = output_dict['logits']
+
+        if not self.training:
+            attn_weights = output_dict['attn_weights']  # Extract attention weights
+        else:
+            attn_weights = None
+        return logits, attn_weights  # Return predictions and attention weights from the second layer. We could also return both layers' weights and average them for example.
 
 # Training function (unchanged)
 def train_transformer_model(model, train_loader, criterion, optimizer, device, epochs):
