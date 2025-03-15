@@ -52,25 +52,32 @@ parser.add_argument('--highlight_threshold', type=float, default=0.5, help='Thre
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = f"{args.dir_data}/"
-    model_path = f"{args.dir_model}/{args.experiment_name}/"
+    input_path = f"{args.dir_results}{args.experiment_name}/"
+    data_path = f"{args.dir_data}{args.experiment_name}/"
     suffix_name = f"AttentionMIL_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_heads{args.n_heads}"
+    model_path = f"{args.dir_model}attention/{args.experiment_name}/{suffix_name}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
+    mask_path = f"{args.dir_data}patches_BRAC/masks/"
+    files_h5_path = f"{input_path}h5_files"
 
+    logger.info(f"mask_path: {mask_path}")
     logger.info(f"input_path: {input_path}")
     logger.info(f"data_path: {data_path}")
     logger.info(f"metrics_path: {metrics_path}")
 
     os.makedirs(metrics_path, exist_ok=True)
     os.makedirs(loss_graph_path, exist_ok=True)
+    os.makedirs(model_path, exist_ok=True)
 
     model_name = f"{args.model_name}{suffix_name}"
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
     files_pt = os.listdir(f"{input_path}/pt_files")
+
+    best_val_metric = float(0)
+        
 
     logger.info("Reading data and generating data loaders")
     target = pd.read_csv(f"{data_path}/target.csv")
@@ -101,11 +108,12 @@ if __name__ == '__main__':
 
         train_dataset = torch.utils.data.Subset(dataset, train_idx)
         val_dataset = torch.utils.data.Subset(dataset, val_idx)
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
         output_size = 1 if num_classes == 2 else num_classes
 
         input_size = next(iter(train_loader))[0].shape[-1]
+
         model = AttentionMILMLP (input_size=input_size, hidden_size=args.hidden_size, attention_class="AttentionMIL", n_heads = args.n_heads, output_size=output_size)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -129,7 +137,24 @@ if __name__ == '__main__':
         
         fold_preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in val_dataset]})
         fold_preds.to_csv(f"{metrics_path}/{predictions_name}_fold{fold + 1}.csv", index=False)
-    
+        
+        # Suponiendo que quieres optimizar el F1-score (ajusta según tu criterio)
+        val_metric = fold_metrics.get('f1', 0)  # O usa otra métrica relevante
+        logger.info(val_metric)
+        logger.info(f"Fold {fold + 1} - F1 Score: {val_metric}")
+
+        logger.info(model_path)
+
+        logger.info(f"val_metric: {val_metric} and best_val_metric: {best_val_metric}")
+        # GUARDAR EL MEJOR MODELO
+        if val_metric > best_val_metric:  # Cambia a "<" si minimizas la pérdida
+            best_val_metric = val_metric
+            best_model_path = os.path.join(model_path, "best_model_attention.pth")
+            torch.save(model.state_dict(), best_model_path )
+            logger.info(f"Nuevo mejor modelo guardado para Fold {fold + 1} con F1 Score: {best_val_metric}")
+
+
+
     final_metrics = {
         key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
         for key in all_metrics[0].keys()
@@ -144,11 +169,17 @@ if __name__ == '__main__':
     logger.info("Evaluating on final test set")
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     
+    model.load_state_dict(torch.load(best_model_path))
+    logger.info(f"model_path: {best_model_path})")
+    model.to(device)
     model.eval()
     predictions, attn_weights, bag_ids = predict_attention_mil(model, test_loader, device, num_classes)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
+    logger.info(f"data_path: {data_path}")
+    logger.info(f"attn_weights: {attn_weights}")
+    
+    visualize_attention(attn_weights, bag_ids, predictions, data_path,files_h5_path,mask_path, suffix_name, args.highlight_threshold)
 
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)

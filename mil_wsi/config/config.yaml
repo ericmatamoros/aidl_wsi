@@ -21,9 +21,9 @@ feature_extraction:
 model_configuration:
   batch_size: 1
   hidden_size: 128
-  epochs: 2
+  epochs: 5
   test_size: 0.1
   k_folds: 4
-  n_heads: 8
+  n_heads: 1
   learning_rate: 0.001
   attention_class: AttentionMIL
