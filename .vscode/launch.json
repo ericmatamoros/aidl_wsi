@@ -70,9 +70,16 @@
             },
             "args": [
                 "--dir_results", "./mil_wsi/results/",
-                "--dir_data", "./mil_wsi/data/",
+                "--dir_data", "./mil_wsi/data_bracs/",
                 "--dir_model", "./mil_wsi/models/",
                 "--dir_metrics", "./mil_wsi/metrics/",
+                "--batch_size",  "512",
+                "--hidden_size", "128",
+                "--epochs", "5",
+                "--test_size", "0.3",
+                "--k_folds", "5",
+                "--learning_rate", "0.001",
+                "--experiment_name", "bracs",
             ]
         },
         {
@@ -98,7 +105,7 @@
             "name": "attention_mil_model",
             "type": "python",
             "request": "launch",
-            "module": "mil_wsi.scripts.transformer_mil_model",
+            "module": "mil_wsi.scripts.attention_mil_model",
             "console": "internalConsole",
             "subProcess": true,
             "env": {
@@ -107,13 +114,17 @@
             },
             "args": [
                 "--dir_results", "./mil_wsi/results/",
-                "--dir_data", "./mil_wsi/data/",
+                "--dir_data", "./mil_wsi/data_bracs/",
                 "--dir_model", "./mil_wsi/models/",
                 "--dir_metrics", "./mil_wsi/metrics/",
-                "--batch_size", "1",
+                "--batch_size",  "1",
                 "--hidden_size", "128",
-                "--epochs", "5",
+                "--epochs", "2",
                 "--test_size", "0.3",
+                "--k_folds", "5",
+                "--n_heads", "8",
+                "--learning_rate", "0.001",
+                "--experiment_name", "bracs",
             ]
         },
         {
