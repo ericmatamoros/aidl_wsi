@@ -1,3 +1,4 @@
+"""Script to train an MLP model"""
 import os
 import argparse
 import json
@@ -92,7 +93,7 @@ if __name__ == '__main__':
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
-    print(data_path)
+    logger.info(data_path)
 
     logger.info("Reading data and generating data loaders")
     # Read target CSV file
@@ -208,9 +209,6 @@ if __name__ == '__main__':
 
 
 
-
-            
-
         
     # Average validation metrics across folds
     final_metrics = {
@@ -234,7 +232,7 @@ if __name__ == '__main__':
     test_dataset = MLPDataset(X_test, y_test)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
-    # Cargar el mejor modelo antes de la evaluación final
+    # Load best model prior to final evaluation
     model.load_state_dict(torch.load(best_model_path))
     model.to(device)
     model.eval()

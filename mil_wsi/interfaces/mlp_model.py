@@ -1,54 +1,85 @@
+"""Code implementation of MLP model"""
 
 import os
 from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .focal_loss import FocalLoss
+from ._focal_loss import FocalLoss
 
 class MLP(nn.Module):
+    """
+    A simple Multi-Layer Perceptron (MLP) model for classification or regression.
+
+    This MLP consists of:
+    - An input layer that connects to a hidden layer with ReLU activation.
+    - A final output layer without an activation function (activation should be handled externally).
+
+    Args:
+        input_size (int): Number of input features.
+        hidden_size (int): Number of neurons in the hidden layer.
+        output_size (int): Number of output neurons (e.g., 1 for binary classification, 
+                           or number of classes for multi-class classification).
+
+    Attributes:
+        fc1 (nn.Linear): Fully connected layer from input to hidden layer.
+        fc2 (nn.Linear): Fully connected layer from hidden to output layer.
+        relu (nn.ReLU): ReLU activation function.
+
+    Methods:
+        forward(x): Computes the forward pass.
+
+    """
     def __init__(self, input_size, hidden_size, output_size):
         super(MLP, self).__init__()
-        # Capa de entrada a capa oculta
         self.fc1 = nn.Linear(input_size, hidden_size)
-        # Capa oculta a capa de salida
         self.fc2 = nn.Linear(hidden_size, output_size)
-        # Función de activación relu
         self.relu = nn.ReLU()
-        # funcion de activacion sigmoid
-        #self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
-            # Propagación hacia adelante
-            x = self.relu(self.fc1(x))  # Aplicamos ReLU después de la primera capa
-            x = self.fc2(x)  # Salida de la segunda capa
-            return x
+        """
+        Forward pass of the MLP.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_size).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, output_size).
+        """
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
     
 
 def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_classes=2, save_path="best_model.pth"):
     """
-    Train an MLP model for binary or multiclass classification.
+    Trains a Multi-Layer Perceptron (MLP) model for binary or multiclass classification.
 
-    Arguments:
-    - model: PyTorch MLP model
-    - train_loader: DataLoader for training
-    - val_loader: DataLoader for validation
-    - optimizer: PyTorch optimizer
-    - device: CUDA or CPU device
-    - epochs: Number of training epochs
-    - num_classes: 2 for binary classification, >2 for multiclass
-    - use_focal_loss: Whether to use Focal Loss
-    - save_path: Path to save the best model
-    
+    This function optimizes the model using a specified loss function, saves the best-performing 
+    model based on validation loss, and returns the final trained model along with loss histories.
+
+    Args:
+        model (torch.nn.Module): The MLP model to be trained.
+        train_loader (torch.utils.data.DataLoader): DataLoader for training data.
+        val_loader (torch.utils.data.DataLoader): DataLoader for validation data.
+        optimizer (torch.optim.Optimizer): Optimizer for model training.
+        device (torch.device): Device for computation (e.g., "cuda" or "cpu").
+        epochs (int): Number of training epochs.
+        num_classes (int, optional): Number of output classes (2 for binary classification, 
+                                     >2 for multiclass classification). Defaults to 2.
+        save_path (str, optional): File path to save the best model. Defaults to "best_model.pth".
+
     Returns:
-    - Trained model (best based on validation loss), train losses, and val losses.
+        torch.nn.Module: The best-trained model based on validation loss.
+        list: Training loss history for each epoch.
+        list: Validation loss history for each epoch.
     """
 
     # Choose loss function based on classification type
     if num_classes == 2:
-        criterion = nn.BCEWithLogitsLoss()  # For binary classification
+        criterion = nn.BCEWithLogitsLoss()
     else:
-        criterion = nn.CrossEntropyLoss()  # For multiclass classification
+        criterion = nn.CrossEntropyLoss()
 
     train_losses = []
     val_losses = []
@@ -122,6 +153,19 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
 
 
 def predict_mlp(model, test_loader, device: torch.device, num_classes: int, threshold=0.5):
+    """
+    Performs inference using a trained MLP model for binary or multiclass classification.
+
+    Args:
+        model (torch.nn.Module): Trained MLP model.
+        test_loader (torch.utils.data.DataLoader): DataLoader containing test data.
+        device (torch.device): Device to run inference on (e.g., "cuda" or "cpu").
+        num_classes (int): Number of output classes (2 for binary classification, >2 for multiclass classification).
+        threshold (float, optional): Threshold for binary classification. Defaults to 0.5.
+
+    Returns:
+        torch.Tensor: Predicted class labels for all test samples.
+    """
     model.eval()
     all_preds = []
 

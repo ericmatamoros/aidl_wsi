@@ -1,3 +1,4 @@
+"""Code implementation of transformer MIL"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +9,22 @@ from loguru import logger
 
 
 class TransLayer(nn.Module):
+    """
+    Transformer-based attention layer using NystromAttention for computational efficiency.
+
+    This layer applies Layer Normalization followed by Nystrom-based self-attention. 
+    The output is residual-connected to the input. If the model is in evaluation mode,
+    the attention weights are also returned.
+
+    Args:
+        norm_layer (nn.Module, optional): Normalization layer to use. Defaults to nn.LayerNorm.
+        dim (int, optional): Feature dimension. Defaults to 512.
+        n_heads (int, optional): Number of attention heads. Defaults to 8.
+
+    Methods:
+        forward(x): Applies attention mechanism and returns updated feature representation.
+
+    """
     def __init__(self, norm_layer=nn.LayerNorm, dim=512, n_heads=8):
         super().__init__()
         self.norm = norm_layer(dim)
@@ -22,6 +39,16 @@ class TransLayer(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Forward pass through the Transformer layer.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, seq_len, dim).
+
+        Returns:
+            torch.Tensor: Updated feature representation with residual connection.
+            torch.Tensor (optional): Attention weights if the model is in evaluation mode.
+        """
         attn_result = None
         if not self.training:
             output, attn_result = self.attn(self.norm(x), return_attn=True)  # Extract attention weights. Only return attention weights if not training.
@@ -32,6 +59,25 @@ class TransLayer(nn.Module):
         return x, attn_result
     
 class PPEG(nn.Module):
+    """
+    Positional Prior Encoding Generator (PPEG).
+
+    This module enhances feature representations by introducing local positional 
+    priors using depth-wise convolutional layers with different kernel sizes. 
+
+    The input feature tokens are reshaped into a 2D spatial grid and processed 
+    through three different convolutional layers (7x7, 5x5, 3x3). The resulting 
+    feature maps are summed with the original features to incorporate positional 
+    information before being flattened back into sequence format.
+
+    Args:
+        dim (int): Feature dimension of the input tensor.
+
+    Methods:
+        forward(x, H, W): Applies convolution-based positional encoding.
+
+    """
+
     def __init__(self, dim):
         super(PPEG, self).__init__()
         self.proj = nn.Conv2d(dim, dim, kernel_size=7, stride=1, padding=7//2, groups=dim)
@@ -39,6 +85,18 @@ class PPEG(nn.Module):
         self.proj2 = nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=3//2, groups=dim)
 
     def forward(self, x, H, W):
+        """
+        Forward pass of the PPEG module.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, seq_len, dim).
+            H (int): Height of the feature map.
+            W (int): Width of the feature map.
+
+        Returns:
+            torch.Tensor: Output tensor with positional priors applied, 
+                          shape (batch_size, seq_len, dim).
+        """
         B, _, C = x.shape
         cls_token, feat_token = x[:, 0], x[:, 1:]
         # Reshape features into a 2D grid
@@ -50,6 +108,31 @@ class PPEG(nn.Module):
         return x
 
 class TransMIL(nn.Module):
+    """
+    Transformer-based Multiple Instance Learning (MIL) model.
+
+    TransMIL processes a set of feature embeddings using a transformer architecture, 
+    incorporating positional encoding and multi-head self-attention layers to learn 
+    instance-level relationships for classification tasks.
+
+    Args:
+        n_classes (int): Number of output classes.
+        n_heads (int): Number of attention heads in the transformer layers.
+        in_dim (int): Input feature dimension.
+
+    Attributes:
+        pos_layer (PPEG): Positional encoding module using convolutional layers.
+        _fc1 (nn.Sequential): Initial feature transformation layer (FC + ReLU).
+        cls_token (nn.Parameter): Learnable class token for global representation.
+        layer1 (TransLayer): First transformer layer.
+        layer2 (TransLayer): Second transformer layer.
+        norm (nn.LayerNorm): Layer normalization before classification.
+        _fc2 (nn.Linear): Final classification layer.
+
+    Methods:
+        forward(**kwargs): Performs forward pass and returns classification results 
+                           along with optional attention weights.
+    """
     def __init__(self, n_classes, n_heads, in_dim):
         super(TransMIL, self).__init__()
         self.in_dim = in_dim
@@ -64,6 +147,20 @@ class TransMIL(nn.Module):
         self._fc2 = nn.Linear(in_dim, self.n_classes)
 
     def forward(self, **kwargs):
+        """
+        Forward pass of the TransMIL model.
+
+        Args:
+            kwargs['data'] (torch.Tensor): Input tensor of shape (batch_size, num_instances, in_dim).
+
+        Returns:
+            dict: A dictionary containing:
+                - 'logits' (torch.Tensor): Raw model predictions of shape (batch_size, n_classes).
+                - 'Y_prob' (torch.Tensor): Softmax probabilities of shape (batch_size, n_classes).
+                - 'Y_hat' (torch.Tensor): Predicted class labels of shape (batch_size,).
+                - 'attn_weights' (torch.Tensor or None): Attention weights from the second transformer 
+                  layer (if in evaluation mode) of shape (batch_size, heads, H, H).
+        """
         # Expect kwargs['data'] to have shape [B, n, in_dim]
         h = kwargs['data'].float()  # [B, n, in_dim]
         h = self._fc1(h)            # [B, n, 512]
@@ -98,6 +195,26 @@ class TransMIL(nn.Module):
         return results_dict
 
 class TransformerMIL(nn.Module):
+    """
+    Transformer-based Multiple Instance Learning (MIL) model.
+
+    This model leverages the `TransMIL` architecture for MIL classification tasks.
+    It processes feature embeddings using a transformer-based self-attention mechanism 
+    and extracts instance-level relationships for bag-level classification.
+
+    Args:
+        input_size (int): Dimensionality of the input feature vectors.
+        n_heads (int): Number of attention heads in the transformer layers.
+        output_size (int): Number of output classes.
+
+    Attributes:
+        attention_mil (TransMIL): Transformer-based MIL model for feature processing.
+        classifier (nn.Identity): Placeholder for classifier (not explicitly used here).
+
+    Methods:
+        forward(x): Performs forward pass and returns predictions along with attention weights.
+
+    """
     def __init__(self, input_size, n_heads, output_size):
         super().__init__()  # Ensure the parent class is initialized properly
 
@@ -106,6 +223,17 @@ class TransformerMIL(nn.Module):
         self.classifier = nn.Identity()
 
     def forward(self, x):
+        """
+        Forward pass of TransformerMIL.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, num_instances, input_size).
+
+        Returns:
+            torch.Tensor: Predicted logits of shape (batch_size, output_size).
+            torch.Tensor (optional): Attention weights from the second transformer layer 
+                                     (if in evaluation mode), shape (batch_size, heads, H, H).
+        """
         output_dict = self.attention_mil(data=x)
         logits = output_dict['logits']
 
@@ -115,8 +243,26 @@ class TransformerMIL(nn.Module):
             attn_weights = None
         return logits, attn_weights  # Return predictions and attention weights from the second layer. We could also return both layers' weights and average them for example.
 
-# Training function (unchanged)
+
 def train_transformer_model(model, train_loader, criterion, optimizer, device, epochs):
+    """
+    Trains a transformer-based Multiple Instance Learning (MIL) model.
+
+    This function trains the model using binary cross-entropy loss for 
+    binary classification tasks, optimizing using the provided optimizer.
+
+    Args:
+        model (torch.nn.Module): Transformer-based MIL model.
+        train_loader (torch.utils.data.DataLoader): DataLoader containing training data.
+        criterion (torch.nn.Module): Loss function (e.g., `nn.BCEWithLogitsLoss` for binary classification).
+        optimizer (torch.optim.Optimizer): Optimizer for model training.
+        device (torch.device): Device to run training on (e.g., "cuda" or "cpu").
+        epochs (int): Number of training epochs.
+
+    Returns:
+        torch.nn.Module: Trained model.
+        torch.Tensor (optional): Attention weights from the last batch.
+    """
     model.train()
     model.to(device)
 
@@ -146,8 +292,24 @@ def train_transformer_model(model, train_loader, criterion, optimizer, device, e
 
     return model, attn_weights
 
-# Prediction function (unchanged)
+
 def predict_transformer_model(model, test_loader, device):
+    """
+    Performs inference using a trained transformer-based Multiple Instance Learning (MIL) model.
+
+    This function evaluates the model on a test dataset, obtaining predictions, 
+    attention weights (if available), and associated bag IDs.
+
+    Args:
+        model (torch.nn.Module): Trained Transformer-based MIL model.
+        test_loader (torch.utils.data.DataLoader): DataLoader containing test data.
+        device (torch.device): Device to run inference on (e.g., "cuda" or "cpu").
+
+    Returns:
+        torch.Tensor: Predictions for each bag (binary classification, values 0 or 1).
+        list (of numpy arrays or None): Attention weights for each bag if available, otherwise None.
+        list (of str): Bag IDs corresponding to each sample.
+    """
     model.eval()
     model.to(device)
 

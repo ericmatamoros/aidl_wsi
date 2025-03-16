@@ -1,3 +1,4 @@
+"""Implementation of Attention & MultiHead-Attention MIL classes and functions"""
 import os
 import torch
 import torch.nn as nn
@@ -11,23 +12,65 @@ import torch.nn.functional as F
 from loguru import logger
 
 class AttentionMIL(nn.Module):
+    """
+    Implements a gated attention-based Multiple Instance Learning (MIL) mechanism.
+
+    This attention mechanism computes instance-level attention scores 
+    and aggregates them to form a bag-level representation.
+
+    Args:
+        input_size (int): Dimension of the input feature vectors.
+        hidden_size (int): Dimension of the hidden layer in the attention mechanism.
+
+    Methods:
+        forward(x): Computes attention scores for instances and 
+                    aggregates them into a bag representation.
+
+    """
     def __init__(self, input_size, hidden_size):
         super(AttentionMIL, self).__init__()
-        self.V = nn.Linear(input_size, hidden_size, bias=False)  # Replaces V * h_i^T
-        self.U = nn.Linear(input_size, hidden_size, bias=False)  # Replaces U * h_i^T
-        self.w = nn.Linear(hidden_size, 1, bias=False)  # Replaces w^T * (...)
+        self.V = nn.Linear(input_size, hidden_size, bias=False)
+        self.U = nn.Linear(input_size, hidden_size, bias=False) 
+        self.w = nn.Linear(hidden_size, 1, bias=False)
     
     def forward(self, x):
-        batch_size, N_instances, _ = x.shape  # Shape: (batch_size, N, M)
-        Vh = torch.tanh(self.V(x))  # Shape: (batch_size, N, hidden_size)
-        Uh = torch.sigmoid(self.U(x))  # Shape: (batch_size, N, hidden_size)
-        gated_output = Vh * Uh  # Shape: (batch_size, N, hidden_size)
-        attn_logits = self.w(gated_output).squeeze(-1)  # Shape: (batch_size, N)
-        attn_weights = torch.softmax(attn_logits, dim=1)  # Normalize
-        bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)  # Shape: (batch_size, input_size)
+        """
+        Forward pass through the attention mechanism.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, num_instances, input_size).
+
+        Returns:
+            torch.Tensor: Bag representation after weighted aggregation, 
+                          shape (batch_size, input_size).
+            torch.Tensor: Attention weights for each instance, shape (batch_size, num_instances).
+        """
+        batch_size, N_instances, _ = x.shape
+        Vh = torch.tanh(self.V(x))
+        Uh = torch.sigmoid(self.U(x))
+        gated_output = Vh * Uh
+        attn_logits = self.w(gated_output).squeeze(-1)
+        attn_weights = torch.softmax(attn_logits, dim=1)
+        bag_representation = torch.sum(attn_weights.unsqueeze(-1) * x, dim=1)
         return bag_representation, attn_weights
 
 class MultiHeadAttention(nn.Module):
+    """
+    Implements Multi-Head Attention for Multiple Instance Learning (MIL).
+
+    This model applies multiple AttentionMIL heads in parallel and averages 
+    their attention weights to form a bag-level representation.
+
+    Args:
+        input_size (int): Dimension of the input feature vectors.
+        hidden_size (int): Dimension of the hidden layer in each attention head.
+        n_heads (int): Number of attention heads.
+
+    Methods:
+        forward(x): Computes multiple attention scores and aggregates 
+                    them into a final bag representation.
+
+    """
     def __init__(self, input_size, hidden_size, n_heads):
         super(MultiHeadAttention, self).__init__()
         self.n_heads = n_heads
@@ -36,6 +79,18 @@ class MultiHeadAttention(nn.Module):
         ])
     
     def forward(self, x):
+        """
+        Forward pass through multiple attention heads.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, num_instances, input_size).
+
+        Returns:
+            torch.Tensor: Bag representation after weighted aggregation, 
+                          shape (batch_size, input_size).
+            torch.Tensor: Averaged attention weights across heads, 
+                          shape (batch_size, num_instances).
+        """
         head_outputs = [head(x) for head in self.heads]
         attn_weights = torch.cat([output[1].unsqueeze(0) for output in head_outputs], dim=0)
         attn_weights = torch.mean(attn_weights, dim=0)
@@ -43,6 +98,31 @@ class MultiHeadAttention(nn.Module):
         return bag_representation, attn_weights
 
 class AttentionMILMLP(nn.Module):
+    """
+    A Multiple Instance Learning (MIL) model with an attention mechanism 
+    and a Multi-Layer Perceptron (MLP) classifier.
+
+    This model applies an attention mechanism to obtain a bag-level 
+    representation and then passes it through an MLP classifier to 
+    generate predictions.
+
+    Args:
+        input_size (int): Dimension of the input feature vectors.
+        hidden_size (int): Dimension of the hidden layer in both attention 
+                           and classifier MLP.
+        attention_class (str): The type of attention mechanism to use. 
+                               Options: "AttentionMIL", "MultiHeadAttention".
+        n_heads (int): Number of attention heads (used only if MultiHeadAttention is selected).
+        output_size (int): Number of output classes.
+
+    Raises:
+        Exception: If an invalid attention mechanism is specified.
+
+    Methods:
+        forward(x): Passes the input through the attention mechanism 
+                    and classifier, returning predictions and attention weights.
+
+    """
     def __init__(self, input_size, hidden_size, attention_class, n_heads, output_size):
         super(AttentionMILMLP, self).__init__()
         
@@ -60,11 +140,49 @@ class AttentionMILMLP(nn.Module):
         )
     
     def forward(self, x):
+        """
+        Forward pass through the attention mechanism and MLP classifier.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, num_instances, input_size).
+
+        Returns:
+            torch.Tensor: Model predictions for each bag.
+            torch.Tensor: Attention weights assigned to instances within each bag.
+        """
         bag_representation, attn_weights = self.attention_mil(x)
         output = self.classifier(bag_representation)  # Pasa por MLP externa
         return output, attn_weights
 
-def train_attention_mil(model, train_loader, val_loader, optimizer, device, epochs, num_classes, save_path="best_model.pth"):
+def train_attention_mil(
+        model, 
+        train_loader, 
+        val_loader, 
+        optimizer, 
+        device, 
+        epochs, 
+        num_classes, 
+        save_path="best_model.pth"):
+    """
+    Trains a multiple instance learning (MIL) model with attention, using either binary 
+    cross-entropy or cross-entropy loss, and saves the best-performing model based on 
+    validation loss.
+
+    Args:
+        model (torch.nn.Module): The MIL model to be trained.
+        train_loader (torch.utils.data.DataLoader): DataLoader for the training dataset.
+        val_loader (torch.utils.data.DataLoader): DataLoader for the validation dataset.
+        optimizer (torch.optim.Optimizer): Optimizer for model training.
+        device (torch.device): Device for computation (e.g., "cuda" or "cpu").
+        epochs (int): Number of training epochs.
+        num_classes (int): Number of output classes (binary classification if num_classes == 2).
+        save_path (str, optional): File path to save the best model. Defaults to "best_model.pth".
+
+    Returns:
+        torch.nn.Module: The best-trained model based on validation loss.
+        list: Training losses for each epoch.
+        list: Validation losses for each epoch.
+    """
     if num_classes == 2:
         criterion = nn.BCEWithLogitsLoss()
     else:
@@ -135,6 +253,22 @@ def train_attention_mil(model, train_loader, val_loader, optimizer, device, epoc
 
 
 def predict_attention_mil(model, test_loader, device,  num_classes: int, threshold=0.5):
+    """
+    Performs inference on a multiple instance learning (MIL) model with attention, 
+    extracting predictions, attention weights, and bag IDs.
+
+    Args:
+        model (torch.nn.Module): The trained MIL model.
+        test_loader (torch.utils.data.DataLoader): DataLoader containing test data.
+        device (torch.device): Device to run the inference on (e.g., "cuda" or "cpu").
+        num_classes (int): Number of output classes (binary classification if num_classes == 2).
+        threshold (float, optional): Threshold for binary classification. Defaults to 0.5.
+
+    Returns:
+        torch.Tensor: Predictions for each bag.
+        list: Attention weights for each bag (as NumPy arrays).
+        list: Bag IDs corresponding to each sample.
+    """
     model.eval()
     model.to(device)
 
