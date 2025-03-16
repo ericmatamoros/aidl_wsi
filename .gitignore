@@ -6,6 +6,8 @@
 *.pth
 *.h5
 *.xlsx
+*.png
+*.jpg
 
 # Folders to omit to upload
 *results/

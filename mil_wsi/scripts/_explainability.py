@@ -6,7 +6,44 @@ import h5py
 from openslide import OpenSlide
 from scipy.ndimage import gaussian_filter
 
-def visualize_attention(all_attn_weights, all_filenames, predictions, data_path, files_h5_path, masks_path, suffix, threshold=0.5, patch_size=257, transformerMIL=False):
+from loguru import logger
+
+def visualize_attention(
+        all_attn_weights, 
+        all_filenames, 
+        predictions, 
+        data_path, 
+        files_h5_path, 
+        masks_path, 
+        suffix, 
+        threshold=0.5,
+        patch_size=257, 
+        transformerMIL=False):
+    
+    """
+    Visualizes attention weights from a Transformer MIL model on whole-slide images (WSIs).
+
+    This function generates:
+    - Histograms of attention scores before and after normalization.
+    - Heatmaps overlaid on the WSI masks to highlight important patches.
+
+    Args:
+        all_attn_weights (list of torch.Tensor or numpy.ndarray): List of attention weight tensors for each WSI.
+        all_filenames (list of str): List of WSI filenames (without extensions).
+        predictions (list): List of model predictions corresponding to each WSI.
+        data_path (str): Path to the directory containing the WSI `.svs` files.
+        files_h5_path (str): Path to the directory containing the `.h5` files with patch coordinates.
+        masks_path (str): Path to the directory containing the WSI masks (`.jpg` format).
+        suffix (str): Suffix to append to the output directory for explainability results.
+        threshold (float, optional): Threshold for attention-based filtering. Defaults to 0.5.
+        patch_size (int, optional): Size of each extracted patch in pixels. Defaults to 257.
+        transformerMIL (bool, optional): If True, aggregates attention weights across multiple heads. Defaults to False.
+
+    Saves:
+        - Histograms of attention scores before and after normalization.
+        - Heatmaps overlaid on the WSI mask to highlight patches with high attention.
+    """
+
     explainability_dir = f"explainability{suffix}"
     os.makedirs(explainability_dir, exist_ok=True)
     #breakpoint()
@@ -85,4 +122,4 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
             plt.savefig(os.path.join(save_dir, f"{wsi_name}.jpg"), bbox_inches="tight", dpi=300)
             plt.close()
         else:
-            print(f"Path not found: {mask_img_path}")
+            logger.info(f"Path not found: {mask_img_path}")

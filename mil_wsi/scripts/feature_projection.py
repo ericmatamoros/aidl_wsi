@@ -1,3 +1,4 @@
+"""Script to project dimensions into a two-dimensional space through UMAP"""
 import os
 import argparse
 import pandas as pd

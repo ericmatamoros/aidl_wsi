@@ -2,7 +2,7 @@
 Interfaces
 """
 
-from .metrics import compute_metrics
+from ._metrics import compute_metrics
 from .mlp_model import (
     train_mlp,
     predict_mlp,
@@ -17,12 +17,6 @@ from .plot_loss import (
 
 from .mil_dataset import (
     MILBagDataset
-)
-
-from .weighted_model import(
-    WeightedModel,
-    train_weighted_model,
-    predict_weighted_model,
 )
 
 from .attention_mil import(
@@ -45,9 +39,6 @@ __all__: list[str] = [
     "predict_mlp",
     "MLP",
     "MILBagDataset",
-    "WeightedModel",
-    "train_weighted_model",
-    "predict_weighted_model",
     "MLPDataset"
     "plot_loss",
     "AttentionMIL",

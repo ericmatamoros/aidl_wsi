@@ -1,5 +1,4 @@
-
-
+"""Script to create patches"""
 from mil_wsi.CLAM import (WholeSlideImage, StitchCoords, initialize_df)
 # other imports
 import os
@@ -13,7 +12,21 @@ from openslide import OpenSlide
 import pandas as pd
 from tqdm import tqdm
 
+from loguru import logger
+
 def stitching(file_path, wsi_object, downscale = 64):
+	"""
+    Stitches patches into a heatmap representation of the WSI.
+
+    Args:
+        file_path (str): Path to the patch coordinate file.
+        wsi_object: Whole Slide Image (WSI) object.
+        downscale (int, optional): Downscaling factor for stitching. Defaults to 64.
+
+    Returns:
+        np.ndarray: Heatmap representation of the stitched patches.
+        float: Time taken for the stitching process.
+    """
 	start = time.time()
 	heatmap = StitchCoords(file_path, wsi_object, downscale=downscale, bg_color=(0,0,0), alpha=-1, draw_grid=False)
 	total_time = time.time() - start
@@ -21,6 +34,19 @@ def stitching(file_path, wsi_object, downscale = 64):
 	return heatmap, total_time
 
 def segment(WSI_object, seg_params = None, filter_params = None, mask_file = None):
+	"""
+    Performs tissue segmentation on a WSI.
+
+    Args:
+        WSI_object: Whole Slide Image (WSI) object.
+        seg_params (dict, optional): Segmentation parameters.
+        filter_params (dict, optional): Filtering parameters for tissue segmentation.
+        mask_file (str, optional): Path to a precomputed segmentation mask.
+
+    Returns:
+        WSI_object: Updated WSI object after segmentation.
+        float: Time taken for the segmentation process.
+    """
 	### Start Seg Timer
 	start_time = time.time()
 	# Use segmentation file
@@ -35,6 +61,17 @@ def segment(WSI_object, seg_params = None, filter_params = None, mask_file = Non
 	return WSI_object, seg_time_elapsed
 
 def patching(WSI_object, **kwargs):
+	"""
+    Extracts patches from the segmented WSI.
+
+    Args:
+        WSI_object: Whole Slide Image (WSI) object.
+        **kwargs: Additional parameters for patch extraction.
+
+    Returns:
+        str: File path to the generated patches.
+        float: Time taken for the patch extraction process.
+    """
 	### Start Patch Timer
 	start_time = time.time()
 
@@ -48,11 +85,32 @@ def patching(WSI_object, **kwargs):
 
 
 def get_wsi_dimensions(wsi_path):
+    """
+    Retrieves the original dimensions of a Whole Slide Image (WSI).
+
+    Args:
+        wsi_path (str): Path to the WSI file.
+
+    Returns:
+        tuple: (width, height) of the WSI.
+    """
     """Gets the dimensions of the original WSI."""
     slide = OpenSlide(wsi_path)
     return slide.dimensions  # Returns (width, height)
 
 def get_target_dimensions(target_path):
+    """
+    Retrieves the dimensions of a visualization file (e.g., mask or stitched image).
+
+    Args:
+        target_path (str): Path to the target visualization file.
+
+    Returns:
+        tuple: (width, height) of the target file.
+
+    Raises:
+        FileNotFoundError: If the file is not found or cannot be read.
+    """
     """Gets the dimensions of the visualization file (masks or stitches)."""
     target_image = cv2.imread(target_path)
     if target_image is None:
@@ -60,11 +118,25 @@ def get_target_dimensions(target_path):
     return target_image.shape[1], target_image.shape[0]  # Returns (width, height)
 
 def draw_patches_on_target(target_path, coords, output_path, scale_x, scale_y, patch_size):
+    """
+    Draws rectangular patches on a visualization file (e.g., mask or stitched image).
+
+    Args:
+        target_path (str): Path to the target visualization file.
+        coords (list of tuples): List of (x, y) coordinates of patches.
+        output_path (str): Path to save the image with drawn patches.
+        scale_x (float): Scaling factor for x-coordinates.
+        scale_y (float): Scaling factor for y-coordinates.
+        patch_size (int): Size of each patch in pixels.
+
+    Saves:
+        - Image with drawn rectangles highlighting patch locations.
+    """
     """Draws rectangles on the visualization file (masks or stitches)."""
     # Load the visualization file
     target_image = cv2.imread(target_path)
     if target_image is None:
-        print(f"Error loading target: {target_path}")
+        logger.info(f"Error loading target: {target_path}")
         return
     
     # Adjust the coordinates and patch size
@@ -97,8 +169,42 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				  patch = False, 
 				  patch_on_mask = False,
 				  auto_skip=True, process_list = None):
-	
+	"""
+    Performs segmentation, patch extraction, and visualization for Whole Slide Images (WSIs).
 
+    This function processes WSIs by:
+    1. Segmenting tissue regions using specified segmentation parameters.
+    2. Extracting patches based on detected regions.
+    3. Optionally stitching extracted patches into a heatmap representation.
+    4. Saving mask visualizations and overlaying patch locations on masks.
+
+    Args:
+        source (str): Path to the directory containing WSI files.
+        save_dir (str): Directory where the process list CSV will be saved.
+        patch_save_dir (str): Directory to save extracted patches.
+        mask_save_dir (str): Directory to save segmentation masks.
+        stitch_save_dir (str): Directory to save stitched heatmaps.
+        mask_on_patch_save_dir (str): Directory to save masks with patch overlays.
+        patch_size (int, optional): Size of each extracted patch in pixels. Defaults to 256.
+        step_size (int, optional): Step size for patch extraction. Defaults to 256.
+        seg_params (dict, optional): Parameters for tissue segmentation.
+        filter_params (dict, optional): Parameters for filtering tissue regions.
+        vis_params (dict, optional): Parameters for mask visualization.
+        patch_params (dict, optional): Parameters for patch extraction.
+        patch_level (int, optional): Image pyramid level for patch extraction. Defaults to 0.
+        use_default_params (bool, optional): If True, use default parameters for all processes. Defaults to False.
+        seg (bool, optional): If True, perform tissue segmentation. Defaults to False.
+        save_mask (bool, optional): If True, save segmentation masks. Defaults to True.
+        stitch (bool, optional): If True, generate stitched heatmaps. Defaults to False.
+        patch (bool, optional): If True, extract patches. Defaults to False.
+        patch_on_mask (bool, optional): If True, overlay extracted patch locations on masks. Defaults to False.
+        auto_skip (bool, optional): If True, skip processing if patches already exist. Defaults to True.
+        process_list (str, optional): Path to a CSV file specifying which slides to process. If None, all slides are processed.
+
+    Returns:
+        float: Average segmentation time per slide.
+        float: Average patch extraction time per slide.
+    """
 
 	slides = sorted(os.listdir(source))
 	slides = [slide for slide in slides if os.path.isfile(os.path.join(source, slide))]
@@ -118,7 +224,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 	legacy_support = 'a' in df.keys()
 	if legacy_support:
-		print('detected legacy segmentation csv file, legacy support enabled')
+		logger.info('detected legacy segmentation csv file, legacy support enabled')
 		df = df.assign(**{'a_t': np.full((len(df)), int(filter_params['a_t']), dtype=np.uint32),
 		'a_h': np.full((len(df)), int(filter_params['a_h']), dtype=np.uint32),
 		'max_n_holes': np.full((len(df)), int(filter_params['max_n_holes']), dtype=np.uint32),
@@ -133,14 +239,14 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		df.to_csv(os.path.join(save_dir, 'process_list_autogen.csv'), index=False)
 		idx = process_stack.index[i]
 		slide = process_stack.loc[idx, 'slide_id']
-		print("\n\nprogress: {:.2f}, {}/{}".format(i/total, i, total))
-		print('processing {}'.format(slide))
+		logger.info("\n\nprogress: {:.2f}, {}/{}".format(i/total, i, total))
+		logger.info('processing {}'.format(slide))
 		
 		df.loc[idx, 'process'] = 0
 		slide_id, _ = os.path.splitext(slide)
 
 		if auto_skip and os.path.isfile(os.path.join(patch_save_dir, slide_id + '.h5')):
-			print('{} already exist in destination location, skipped'.format(slide_id))
+			logger.info('{} already exist in destination location, skipped'.format(slide_id))
 			df.loc[idx, 'status'] = 'already_exist'
 			continue
 
@@ -218,7 +324,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		w, h = WSI_object.level_dim[current_seg_params['seg_level']] 
 		if w * h > 1e8:
-			print('level_dim {} x {} is likely too large for successful segmentation, aborting'.format(w, h))
+			logger.info('level_dim {} x {} is likely too large for successful segmentation, aborting'.format(w, h))
 			df.loc[idx, 'status'] = 'failed_seg'
 			continue
 
@@ -267,9 +373,9 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				os.path.join(mask_on_patch_save_dir, slide_id+'.jpg'), SCALE_X, SCALE_Y, patch_size)
 						
 
-		print("segmentation took {} seconds".format(seg_time_elapsed))
-		print("patching took {} seconds".format(patch_time_elapsed))
-		print("stitching took {} seconds".format(stitch_time_elapsed))
+		logger.info("segmentation took {} seconds".format(seg_time_elapsed))
+		logger.info("patching took {} seconds".format(patch_time_elapsed))
+		logger.info("stitching took {} seconds".format(stitch_time_elapsed))
 		df.loc[idx, 'status'] = 'processed'
 
 		seg_times += seg_time_elapsed
@@ -281,9 +387,9 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 	stitch_times /= total
 
 	df.to_csv(os.path.join(save_dir, 'process_list_autogen.csv'), index=False)
-	print("average segmentation time in s per slide: {}".format(seg_times))
-	print("average patching time in s per slide: {}".format(patch_times))
-	print("average stiching time in s per slide: {}".format(stitch_times))
+	logger.info("average segmentation time in s per slide: {}".format(seg_times))
+	logger.info("average patching time in s per slide: {}".format(patch_times))
+	logger.info("average stiching time in s per slide: {}".format(stitch_times))
 		
 	return seg_times, patch_times
 
@@ -324,11 +430,11 @@ if __name__ == '__main__':
 	else:
 		process_list = None
 
-	print('source: ', args.source)
-	print('patch_save_dir: ', patch_save_dir)
-	print('mask_save_dir: ', mask_save_dir)
-	print('stitch_save_dir: ', stitch_save_dir)
-	print('mask_on_patch: ', mask_on_patch_save_dir)
+	logger.info('source: ', args.source)
+	logger.info('patch_save_dir: ', patch_save_dir)
+	logger.info('mask_save_dir: ', mask_save_dir)
+	logger.info('stitch_save_dir: ', stitch_save_dir)
+	logger.info('mask_on_patch: ', mask_on_patch_save_dir)
 	
 	directories = {'source': args.source, 
 				   'save_dir': os.path.join(args.save_dir, f"{args.experiment_name}/"),
@@ -338,7 +444,7 @@ if __name__ == '__main__':
 				   'mask_on_patch_save_dir': mask_on_patch_save_dir} 
 
 	for key, val in directories.items():
-		print("{} : {}".format(key, val))
+		logger.info("{} : {}".format(key, val))
 		if key not in ['source']:
 			os.makedirs(val, exist_ok=True)
 
@@ -367,7 +473,7 @@ if __name__ == '__main__':
 	 			  'patch_params': patch_params,
 				  'vis_params': vis_params}
 
-	print(parameters)
+	logger.info(parameters)
 
 	seg_times, patch_times = seg_and_patch(**directories, **parameters,
 											patch_size = args.patch_size, step_size=args.step_size, 
