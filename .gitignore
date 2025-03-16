@@ -1,8 +1,6 @@
 # Files to avoid being committed
 *.svs
 *.pyc
-*.png
-*.jpg
 *.json
 *.csv
 *.pth
