@@ -309,7 +309,7 @@ RESULTS
 Below you can find a video showcasing the **Streamlit application** performing real-time inference of a given WSI, where it's generating the whole image segmentation, masking, feature extraction, prediction of the class and heatmap generation in real time:
 
 **Click on the image** to load the Youtube video:
-[![Streamlit MIL for WSI classification with Post-Hoc Explainability Maps](images/streamlit.png)](https://www.youtube.com/watch?v=4ZEaZEFkQZM)
+[![Streamlit MIL for WSI classification with Post-Hoc Explainability Maps](./images/streamlit.png)](https://www.youtube.com/watch?v=4ZEaZEFkQZM)
 
 
 # Work In Progress (WIP) - UPDATE ON 16/03/2026
