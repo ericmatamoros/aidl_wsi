@@ -6,8 +6,7 @@ import umap
 import torch
 import matplotlib.pyplot as plt
 from loguru import logger
-
-from mil_wsi.interfaces import MLPDataset
+import sys
 
 import warnings
 warnings.filterwarnings("ignore")

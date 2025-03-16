@@ -13,3 +13,8 @@
 *results/
 *data/*
 */data_bracs/*
+mil_wsi/data/dataset
+mil_wsi.egg-info/dependency_links.txt
+mil_wsi.egg-info/PKG-INFO
+mil_wsi.egg-info/SOURCES.txt
+mil_wsi.egg-info/top_level.txt

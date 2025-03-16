@@ -10,7 +10,6 @@ def visualize_attention(all_attn_weights, all_filenames, predictions, data_path,
     explainability_dir = f"explainability{suffix}"
     os.makedirs(explainability_dir, exist_ok=True)
 
-    print("do we enter the place?")
     for i, (attn_weights, wsi_name) in enumerate(zip(all_attn_weights, all_filenames)):
         wsi_img_path = os.path.join(f"{data_path}", f"{wsi_name}.svs")
         mask_img_path = os.path.join(f"{masks_path}", f"{wsi_name}.jpg")

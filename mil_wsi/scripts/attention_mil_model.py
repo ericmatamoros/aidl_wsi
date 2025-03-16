@@ -74,7 +74,7 @@ if __name__ == '__main__':
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
-    files_pt = os.listdir(f"{input_path}/pt_files_conch")
+    files_pt = os.listdir(f"{input_path}/pt_files")
 
     best_val_metric = float(0)
         
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
     num_classes = len(np.unique(target['target'].values))
 
-    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files_conch"), target)
+    dataset = MILBagDataset(input_path, os.listdir(f"{input_path}/pt_files"), target)
     targets = [dataset[i][1] for i in range(len(dataset))]
     
     # Split dataset into train and test
