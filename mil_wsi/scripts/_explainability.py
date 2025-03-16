@@ -9,7 +9,8 @@ from scipy.ndimage import gaussian_filter
 def visualize_attention(all_attn_weights, all_filenames, predictions, data_path, files_h5_path, masks_path, suffix, threshold=0.5, patch_size=257, transformerMIL=False):
     explainability_dir = f"explainability{suffix}"
     os.makedirs(explainability_dir, exist_ok=True)
-
+    #breakpoint()
+    masks_path = "./mil_wsi/data/patches_normal/masks/"
     for i, (attn_weights, wsi_name) in enumerate(zip(all_attn_weights, all_filenames)):
         wsi_img_path = os.path.join(f"{data_path}", f"{wsi_name}.svs")
         mask_img_path = os.path.join(f"{masks_path}", f"{wsi_name}.jpg")

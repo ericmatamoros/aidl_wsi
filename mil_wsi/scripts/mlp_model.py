@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
     parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
+    parser.add_argument('--dimentions', type=int, help='Numer of latent spaces')
 
 
     args = parser.parse_args()
@@ -75,7 +76,7 @@ if __name__ == '__main__':
     # Define directories and create them if they don't exist
     input_path = f"{args.dir_results}/{args.experiment_name}/"
     data_path = f"{args.dir_data}{args.experiment_name}"
-    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}"
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_dim{args.dimentions}"
     model_path = f"{args.dir_model}mlp/{args.experiment_name}/{suffix_name}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
@@ -109,7 +110,8 @@ if __name__ == '__main__':
     df = load_data(input_path, files_pt, target)
 
     # Separate features and target
-    features = df.iloc[:, 0:args.batch_size]
+    #breakpoint()
+    features = df.iloc[:, 0:args.dimentions]
     input_size = features.shape[1]
     target = df['target']
     num_classes = len(np.unique(target))
@@ -244,6 +246,10 @@ if __name__ == '__main__':
     predictions = predictions.round().astype(int)
 
     # Save test set predictions to CSV
+    if num_classes == 2:
+        predictions = predictions.flatten()  # Asegura que predictions sea 1D
+        y_test = np.array(y_test).flatten()  # Asegura que y_test sea 1D
+    
     preds = pd.DataFrame({'y_pred': predictions, 'y_true': y_test})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 

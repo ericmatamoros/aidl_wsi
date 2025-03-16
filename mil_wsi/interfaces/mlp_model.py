@@ -43,7 +43,6 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
     Returns:
     - Trained model (best based on validation loss), train losses, and val losses.
     """
-
     # Choose loss function based on classification type
     if num_classes == 2:
         criterion = nn.BCEWithLogitsLoss()  # For binary classification
@@ -63,9 +62,11 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-
+            #breakpoint()
             if num_classes == 2:
-                loss = criterion(outputs.squeeze(), labels.float())  # Binary
+                #loss = criterion(outputs.view(-1), labels.float())  # Binary
+                focal_loss = FocalLoss()
+                loss = focal_loss(outputs.view(-1), labels.float())
             else:
                 loss = criterion(outputs, labels.long())  # Multiclass
 
@@ -86,7 +87,7 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
                 outputs = model(inputs)
 
                 if num_classes == 2:
-                    loss = criterion(outputs.squeeze(), labels.float())  # Binary
+                    loss = criterion(outputs.view(-1), labels.float())  # Binary .squeeze()
                 else:
                     loss = criterion(outputs, labels.long())  # Multiclass
 
@@ -132,6 +133,7 @@ def predict_mlp(model, test_loader, device: torch.device, num_classes: int, thre
 
             if num_classes == 2:
                 probs = torch.sigmoid(outputs)  # Binary classification
+                #threshold = probs.mean().item() 
                 preds = (probs > threshold).float()
             else:
                 preds = torch.argmax(F.softmax(outputs, dim=1), dim=1)  # Multiclass classification

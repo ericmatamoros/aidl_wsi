@@ -85,7 +85,7 @@ def train_attention_mil(model, train_loader, val_loader, optimizer, device, epoc
             outputs, _ = model(inputs)
             
             if num_classes == 2:
-                loss = criterion(outputs.squeeze(), labels.float())
+                loss = criterion(outputs.view(-1), labels.float())
             else:
                 loss = criterion(outputs, labels.long())
             
@@ -104,7 +104,7 @@ def train_attention_mil(model, train_loader, val_loader, optimizer, device, epoc
                 outputs, _ = model(inputs)
                 
                 if num_classes == 2:
-                    loss = criterion(outputs.squeeze(), labels.float())
+                    loss = criterion(outputs.view(-1), labels.float())
                 else:
                     loss = criterion(outputs, labels.long())
                 

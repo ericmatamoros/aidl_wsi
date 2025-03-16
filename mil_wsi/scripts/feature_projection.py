@@ -44,12 +44,14 @@ def load_data(input_path: str, files_pt: list, target: pd.DataFrame) -> pd.DataF
 parser = argparse.ArgumentParser(description='Feature Projection')
 parser.add_argument('--dir_results', type=str, help='Path to folder containing the results')
 parser.add_argument('--dir_data', type=str, help='Path containing slides')
+parser.add_argument('--dimentions', type=int, default=1024, help='Number of latent spaces')
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     input_path = args.dir_results
     data_path = args.dir_data
+    dimentions = args.dimentions
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
@@ -64,7 +66,7 @@ if __name__ == '__main__':
     # Load data from .pt files and merge with target
     df = load_data(input_path, files_pt, target)
 
-    features = df.iloc[:, :-2].values  # All columns except 'target' and 'filename'
+    features = df.iloc[:, 0:dimentions].values 
     targets = df["target"].values
 
     # Apply UMAP
@@ -80,5 +82,4 @@ if __name__ == '__main__':
     plt.ylabel("UMAP Dimension 2")
     plt.title("UMAP Projection Colored by Target")
     
-    plt.savefig(f"{input_path}/feature_projection", dpi=300, bbox_inches="tight")
-    
+    plt.savefig(f"{input_path}/feature_projection", dpi=300, bbox_inches="tight")   
