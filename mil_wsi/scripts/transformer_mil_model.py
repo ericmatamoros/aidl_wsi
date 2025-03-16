@@ -125,15 +125,28 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model.eval()
+
     predictions, attn_weights, bag_ids = predict_transformer_model(model, test_loader, device)
     predictions = predictions.cpu().numpy().round().astype(int)
 
-    visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold)
+    visualize_attention(attn_weights, bag_ids, predictions, data_path, suffix_name, args.highlight_threshold, transformerMIL=True)
 
+    # Convert predictions to a DataFrame and save to CSV
     preds = pd.DataFrame({'y_pred': predictions.ravel(), 'y_true': [y for _, y, _ in test_dataset]})
     preds.to_csv(f"{metrics_path}/{predictions_name}_test.csv", index=False)
 
+    # Compute metrics and convert confusion matrix to a serializable format
     metrics = compute_metrics(predictions, [y for _, y, _ in test_dataset])
+
+    # Convert confusion matrix DataFrame to dictionary
+    if isinstance(metrics['confusion_matrix'], pd.DataFrame):
+        metrics['confusion_matrix'] = {
+            f"Actual_{i}-Predicted_{j}": int(metrics['confusion_matrix'].iloc[i, j])
+            for i in range(metrics['confusion_matrix'].shape[0])
+            for j in range(metrics['confusion_matrix'].shape[1])
+        }
+
+    # Save metrics as JSON
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 

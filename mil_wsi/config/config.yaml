@@ -1,5 +1,10 @@
 # Configuration
 
+data_path: "./mil_wsi/data/"
+results_path: "./mil_wsi/results/"
+metrics_path: "./mil_wsi/metrics/"
+models_path: "./mil_wsi/models/"
+
 # Main
 experiment_name: 'bracs'
 
@@ -16,10 +21,9 @@ feature_extraction:
 model_configuration:
   batch_size: 1
   hidden_size: 128
-  epochs: 5
-  test_size: 0.3
-  k_folds: 5
-  n_heads: 8
-  output_size: 1
+  epochs: 2
+  test_size: 0.16
+  k_folds: 4
+  n_heads: 1
   learning_rate: 0.001
   attention_class: AttentionMIL

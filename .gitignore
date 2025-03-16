@@ -6,6 +6,8 @@
 *.json
 *.csv
 *.pth
+*.h5
+*.xlsx
 
 # Folders to omit to upload
 *results/

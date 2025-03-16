@@ -74,14 +74,14 @@ if __name__ == '__main__':
 
     # Define directories and create them if they don't exist
     input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = f"{args.dir_data}{args.experiment_name}"
+    data_path = f"{args.dir_data}/"
+    model_path = f"{args.dir_model}/{args.experiment_name}/"
     suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}"
-    model_path = f"{args.dir_model}mlp/{args.experiment_name}/{suffix_name}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
 
     os.makedirs(input_path, exist_ok=True)
-    #os.makedirs(data_path, exist_ok=True)
+    os.makedirs(data_path, exist_ok=True)
     os.makedirs(model_path, exist_ok=True)
     os.makedirs(metrics_path, exist_ok=True)
     os.makedirs(loss_graph_path, exist_ok=True)
@@ -92,11 +92,9 @@ if __name__ == '__main__':
 
     files_pt = os.listdir(f"{input_path}/pt_files")
 
-    print(data_path)
-
     logger.info("Reading data and generating data loaders")
     # Read target CSV file
-    target = pd.read_csv(f"{data_path}/target.csv")
+    target = pd.read_csv(f"{data_path}target.csv")
     target['filename'] = target['slide'].str.replace('.svs', '', regex=False)
     # Uncomment the following line to invert target values if needed (positive class = 1)
     # target['target'] = 1 - target['target']
@@ -111,8 +109,6 @@ if __name__ == '__main__':
     # Separate features and target
     features = df.iloc[:, 0:args.batch_size]
     input_size = features.shape[1]
-    print("input size:")
-    print(input_size)
     target = df['target']
     num_classes = len(np.unique(target))
 
@@ -130,8 +126,6 @@ if __name__ == '__main__':
     all_predictions = []
     train_losses_total = []
     val_losses_total = []
-
-    best_val_metric = float(0)
 
     # Convert training data to NumPy arrays for fold indexing. This is necessary because StratifiedKFold's split() method expects NumPy arrays rather than DataFrames.
     X_np = X_train.to_numpy()
@@ -190,30 +184,8 @@ if __name__ == '__main__':
 
         # Calculate and store metrics for this fold
         fold_metrics = compute_metrics(predictions, y_val_fold, num_classes)
-        logger.info(fold_metrics)
         all_metrics.append(fold_metrics)
 
-        # Suponiendo que quieres optimizar el F1-score (ajusta según tu criterio)
-        val_metric = fold_metrics.get('f1', 0)  # O usa otra métrica relevante
-        logger.info(val_metric)
-        logger.info(f"Fold {fold + 1} - F1 Score: {val_metric}")
-
-        logger.info(model_path)
-
-        logger.info(f"val_metric: {val_metric} and best_val_metric: {best_val_metric}")
-        # GUARDAR EL MEJOR MODELO
-        if val_metric > best_val_metric:  # Cambia a "<" si minimizas la pérdida
-            best_val_metric = val_metric
-            best_model_path = os.path.join(model_path, "best_model_mlp.pth")
-            torch.save(model.state_dict(), best_model_path )
-            logger.info(f"Nuevo mejor modelo guardado para Fold {fold + 1} con F1 Score: {best_val_metric}")
-
-
-
-
-            
-
-        
     # Average validation metrics across folds
     final_metrics = {
         key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}
@@ -236,9 +208,6 @@ if __name__ == '__main__':
     test_dataset = MLPDataset(X_test, y_test)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
-    # Cargar el mejor modelo antes de la evaluación final
-    model.load_state_dict(torch.load(best_model_path))
-    model.to(device)
     model.eval()
     logger.info("Performing predictions using MLP model")
     predictions = predict_mlp(model, test_loader, device, num_classes)
