@@ -6,7 +6,7 @@ metrics_path: "./mil_wsi/metrics/"
 models_path: "./mil_wsi/models/"
 
 # Main
-experiment_name: 'bracs'
+experiment_name: 'normal'
 
 create_patches:
   patch_size: 256
@@ -21,8 +21,8 @@ feature_extraction:
 model_configuration:
   batch_size: 1
   hidden_size: 128
-  epochs: 2
-  test_size: 0.16
+  epochs: 50
+  test_size: 0.2
   k_folds: 4
   n_heads: 1
   learning_rate: 0.001

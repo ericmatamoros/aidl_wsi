@@ -8,6 +8,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(project_root)
 
 from mil_wsi import CONFIG_PATH
+from loguru import logger
 
 def run_task(command, env_vars=None):
     """Runs a shell command with optional environment variables and prints logs in real-time."""
@@ -48,30 +49,37 @@ def main():
     tasks = {
         "1": ("Create Patches", f"conda run -n wsi python -m mil_wsi.scripts.create_patches --source {data_path} --save_dir {results_path} --patch_size {create_patch_settings['patch_size']} --step_size {create_patch_settings['step_size']} --seg --patch --stitch --experiment_name {settings['experiment_name']}"),
         "2": ("Extract Features", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.extract_features --data_h5_dir {results_path} --data_slide_dir {data_path} --csv_path {results_path} --feat_dir {results_path} --model_name {feat_extract_settings['model_name']} --batch_size {feat_extract_settings['batch_size']} --slide_ext {feat_extract_settings['slide_ext']} --experiment_name {settings['experiment_name']}"),
-        "3": ("MLP Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --experiment_name {settings['experiment_name']}"),
+<<<<<<< HEAD
+        "3": ("MLP Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --experiment_name {settings['experiment_name']} --dimentions {feat_extract_settings['batch_size']*2}"),
         "4": ("Weighted Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.weighted_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --experiment_name {settings['experiment_name']}"),
         "5": ("Attention MIL", f"conda run -n wsi python -m mil_wsi.scripts.attention_mil_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --attention_class {model_conf_settings['attention_class']} --n_heads {model_conf_settings['n_heads']} --experiment_name {settings['experiment_name']}"),
         "6": ("Transformer MIL", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.transformer_mil_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --n_heads {model_conf_settings['n_heads']} --experiment_name {settings['experiment_name']}"),
         "7": ("Run Full Pipeline", ""),
+=======
+        "3": ("MLP Model", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.mlp_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --experiment_name {settings['experiment_name']}"),
+        "4": ("Attention MIL", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.attention_mil_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --hidden_size {model_conf_settings['hidden_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --attention_class {model_conf_settings['attention_class']} --n_heads {model_conf_settings['n_heads']} --experiment_name {settings['experiment_name']}"),
+        "5": ("Transformer MIL", f"conda run -n wsi CUDA_VISIBLE_DEVICES=0 python -m mil_wsi.scripts.transformer_mil_model --dir_results {results_path} --dir_data {data_path} --dir_model {models_path} --dir_metrics {metrics_path} --batch_size {model_conf_settings['batch_size']} --epochs {model_conf_settings['epochs']} --test_size {model_conf_settings['test_size']} --k_folds {model_conf_settings['k_folds']} --learning_rate {model_conf_settings['learning_rate']} --n_heads {model_conf_settings['n_heads']} --experiment_name {settings['experiment_name']}"),
+        "6": ("Run Full Pipeline", ""),
+>>>>>>> e57f86bbeffd59c7e0633c9a3eff2f46f1a82ee6
     }
     
-    print("Select a task to run:")
+    logger.info("Select a task to run:")
     for key, (name, _) in tasks.items():
-        print(f"[{key}] {name}")
+        logger.info(f"[{key}] {name}")
     
     choice = input("Enter the number of the task: ")
     
     if choice in tasks:
         name, command = tasks[choice]
-        print(f"Running: {name}\n")
-        if choice == "7":  # Full pipeline
-            for task_key in ["1", "2", "3", "4", "5", "6"]:
-                print(f"Executing: {tasks[task_key][0]}")
+        logger.info(f"Running: {name}\n")
+        if choice == "6":  # Full pipeline
+            for task_key in ["1", "2", "3", "4", "5"]:
+                logger.info(f"Executing: {tasks[task_key][0]}")
                 run_task(tasks[task_key][1])
         else:
             run_task(command)
     else:
-        print("Invalid choice. Please select a valid task number.")
+        logger.info("Invalid choice. Please select a valid task number.")
 
 if __name__ == "__main__":
     main()

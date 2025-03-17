@@ -1,16 +1,37 @@
+"""Convert SVS to png"""
 import os
 import argparse
 import openslide
 from PIL import Image
 import matplotlib.pyplot as plt
 
+from loguru import logger
+
 
 def convert_to_png(source: str, save_dir: str, custom_image: str, file_extension: str):
+    """
+    Converts whole-slide images (WSI) from a given format (SVS, NDPI, TIFF) to PNG.
+
+    This function processes images from a source directory and saves PNG thumbnails 
+    of size (1024, 1024) in the specified save directory. If a custom image is provided, 
+    only that image will be converted.
+
+    Args:
+        source (str): Path to the source directory containing image files.
+        save_dir (str): Path to the directory where converted PNGs will be saved.
+        custom_image (str): Name of a specific file to be converted. If empty, all images of 
+                            the specified file extension will be processed.
+        file_extension (str): The file extension to filter images (e.g., "svs", "ndpi", "tiff").
+
+    Raises:
+        Exception: If the provided file format is unsupported.
+
+    """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-        print(f"Directory created: {save_dir}")
+        logger.info(f"Directory created: {save_dir}")
     else:
-        print(f"Directory already exists: {save_dir}")
+        logger.info(f"Directory already exists: {save_dir}")
 
     files = [f for f in os.listdir(source) if os.path.isfile(os.path.join(source, f))]
     files = [x for x in files if file_extension.lower() in x.lower()]
@@ -25,19 +46,19 @@ def convert_to_png(source: str, save_dir: str, custom_image: str, file_extension
 
     # Check file extension and process accordingly
     if file_extension.lower() in ['svs', 'ndpi', 'tiff']:
-        print(f"Conversion from {file_extension.upper()} to PNG")
+        logger.info(f"Conversion from {file_extension.upper()} to PNG")
 
         for file in files:
-            print(f"Processing file: {file}")
+            logger.info(f"Processing file: {file}")
             filename = os.path.basename(file).split(f".{file_extension}")[0]
             
             try:
                 slide = openslide.OpenSlide(file)
                 thumbnail = slide.get_thumbnail((1024, 1024))  # Resize thumbnail to 1024x1024
                 thumbnail.save(f"{save_dir}/{filename}.png", format="PNG")
-                print(f"Saved: {save_dir}/{filename}.png")
+                logger.info(f"Saved: {save_dir}/{filename}.png")
             except Exception as e:
-                print(f"Error processing file {file}: {e}")
+                logger.info(f"Error processing file {file}: {e}")
     else:
         raise Exception(f"Currently we do not support the {file_extension} conversion to PNG")
 

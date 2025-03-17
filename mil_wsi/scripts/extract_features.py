@@ -1,8 +1,10 @@
+"""Script to extract features from patches"""
 import time
 import os
 import argparse
 import pdb
 from functools import partial
+from loguru import logger
 
 import torch
 import torch.nn as nn
@@ -18,25 +20,26 @@ import platform
 
 from mil_wsi.CLAM  import (save_hdf5, Dataset_All_Bags, Whole_Slide_Bag_FP, get_encoder)
 
-def get_device():
-    if platform.system() == "Darwin":  # macOS
-        return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    elif torch.cuda.is_available():  # Windows/Linux with CUDA
-        return torch.device("cuda")
-    else:
-        return torch.device("cpu")  # Fallback to CPU
-
-device = torch.device("cpu")
 
 def compute_w_loader(output_path, loader, model, verbose = 0):
-	"""
-	args:
-		output_path: directory to save computed features (.h5 file)
-		model: pytorch model
-		verbose: level of feedback
-	"""
+	""""
+    Computes features from a PyTorch model and saves them in an HDF5 file.
+
+    This function processes a DataLoader batch by batch, extracts features 
+    using the given model, and saves them along with their coordinates.
+
+    Args:
+        output_path (str): Path to save computed features in HDF5 format.
+        loader (torch.utils.data.DataLoader): DataLoader providing image batches and coordinates.
+        model (torch.nn.Module): PyTorch model for feature extraction.
+        device (torch.device): Device for computation ('cuda', 'mps', or 'cpu').
+        verbose (int, optional): Level of feedback (0 = no output, 1 = print batch count). Defaults to 0.
+
+    Returns:
+        str: Path where the computed features are saved.
+    """
 	if verbose > 0:
-		print(f'processing a total of {len(loader)} batches'.format(len(loader)))
+		logger.info(f'processing a total of {len(loader)} batches'.format(len(loader)))
 
 	mode = 'w'
 	for count, data in enumerate(tqdm(loader)):
@@ -71,11 +74,12 @@ parser.add_argument('--num_workers', type=int, default=8)
 args = parser.parse_args()
 
 if __name__ == '__main__':
-	print('initializing dataset')
+	logger.info('initializing dataset')
 	csv_path = args.csv_path
 	if csv_path is None:
 		raise NotImplementedError
 
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	bags_dataset = Dataset_All_Bags(f"{csv_path}/{args.experiment_name}/process_list_autogen.csv")
 	
 	os.makedirs(args.feat_dir, exist_ok=True)
@@ -97,15 +101,15 @@ if __name__ == '__main__':
 		bag_name = slide_id+'.h5'
 		h5_file_path = os.path.join(args.data_h5_dir, f"{args.experiment_name}/", 'patches', bag_name)
 		slide_file_path = os.path.join(args.data_slide_dir, slide_id+args.slide_ext)
-		print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
-		print(slide_id)
+		logger.info('\nprogress: {}/{}'.format(bag_candidate_idx, total))
+		logger.info(slide_id)
 
 		if not os.path.exists(h5_file_path):
-			print(f'Skipping {slide_id} because {h5_file_path} does not exist')
+			logger.info(f'Skipping {slide_id} because {h5_file_path} does not exist')
 			continue
 
 		if not args.no_auto_skip and slide_id+'.pt' in dest_files:
-			print('skipped {}'.format(slide_id))
+			logger.info('skipped {}'.format(slide_id))
 			continue 
 
 		output_path = os.path.join(args.feat_dir,  f"{args.experiment_name}/", 'h5_files', bag_name)
@@ -119,12 +123,12 @@ if __name__ == '__main__':
 		output_file_path = compute_w_loader(output_path, loader = loader, model = model, verbose = 1)
 
 		time_elapsed = time.time() - time_start
-		print('\ncomputing features for {} took {} s'.format(output_file_path, time_elapsed))
+		logger.info('\ncomputing features for {} took {} s'.format(output_file_path, time_elapsed))
 
 		with h5py.File(output_file_path, "r") as file:
 			features = file['features'][:]
-			print('features size: ', features.shape)
-			print('coordinates size: ', file['coords'].shape)
+			logger.info('features size: ', features.shape)
+			logger.info('coordinates size: ', file['coords'].shape)
 
 		features = torch.from_numpy(features)
 		bag_base, _ = os.path.splitext(bag_name)

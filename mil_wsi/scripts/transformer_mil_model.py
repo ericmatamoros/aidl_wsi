@@ -1,3 +1,4 @@
+"""Script to train a transformer model"""
 import os
 import argparse
 import json

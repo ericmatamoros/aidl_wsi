@@ -1,13 +1,13 @@
 # Files to avoid being committed
 *.svs
 *.pyc
-*.png
-*.jpg
 *.json
 *.csv
 *.pth
 *.h5
 *.xlsx
+*.png
+*.jpg
 
 # Folders to omit to upload
 *results/

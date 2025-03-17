@@ -1,20 +1,28 @@
+"""Plot losses of the model"""
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
 def plot_loss(loss_list, output_dir, suffix_name, training_type):
     """
-    Generates and saves two loss plots per epoch:
-    1. A plot showing the **average loss across all folds**.
+    Generates and saves loss plots per epoch:
+    
+    1. A plot showing the **average loss across all folds** (if using K-Fold).
     2. A plot displaying the **loss for each individual fold**.
 
-    Parameters:
-    - loss_list: List of losses (a list of lists if using K-Fold).
-    - output_dir: Directory where the plot images will be saved.
-    - suffix_name: Suffix for naming the output files.
-    - training_type: Type of training (e.g., "MIL", "CNN", etc.).
-    """
+    Args:
+        loss_list (list of lists or list): 
+            - If using K-Fold, it's a list where each element is a list of losses per epoch for a fold.
+            - If not using K-Fold, it's a single list of losses per epoch.
+        output_dir (str): Path to the directory where the plots will be saved.
+        suffix_name (str): Suffix for naming the output files.
+        training_type (str): Type of training (e.g., "MIL", "CNN", etc.).
 
+    Saves:
+        - `{training_type}_{suffix_name}_loss_plot_mean.png`: Plot of the mean loss per epoch.
+        - `{training_type}_{suffix_name}_loss_plot_folds.png`: Plot of loss per epoch for each fold.
+    
+    """
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
