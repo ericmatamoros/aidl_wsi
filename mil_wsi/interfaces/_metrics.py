@@ -7,6 +7,7 @@ def compute_metrics(y_pred, y_true, num_classes):
         precision = precision_score(y_true, y_pred, pos_label=1)
         recall = recall_score(y_true, y_pred, pos_label=1)
         f1 = f1_score(y_true, y_pred, pos_label=1)
+        breakpoint()
         
         # Compute confusion matrix
         cm = confusion_matrix(y_true, y_pred)

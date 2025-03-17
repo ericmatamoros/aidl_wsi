@@ -273,5 +273,4 @@ if __name__ == '__main__':
     with open(f'{metrics_path}/{metrics_name}_test.json', 'w') as json_file:
         json.dump(metrics, json_file, indent=4)
 
-    logger.info(f"Saving predictions to: {metrics_path}/{predictions_name}_test.csv")
     logger.info(f"Saving metrics to: {metrics_path}/{metrics_name}_test.json")
