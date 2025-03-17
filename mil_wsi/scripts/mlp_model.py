@@ -92,7 +92,7 @@ if __name__ == '__main__':
     model_name = f"{args.model_name}{suffix_name}"
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
-
+    #dimentions = {args.dimentions}
 
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Error: Data path '{data_path}' doesn't exist ")
@@ -139,7 +139,8 @@ if __name__ == '__main__':
     all_predictions = []
     train_losses_total = []
     val_losses_total = []
-
+    best_epoch_total = []
+    
     best_val_metric = float(0)
 
     # Convert training data to NumPy arrays for fold indexing. This is necessary because StratifiedKFold's split() method expects NumPy arrays rather than DataFrames.
@@ -179,15 +180,17 @@ if __name__ == '__main__':
         n_epochs = args.epochs
 
         # Train the model for this fold
-        model, train_losses, val_losses = train_mlp(
+        model, train_losses, val_losses, best_epoch = train_mlp(
             model, train_loader, val_loader, optimizer, device, n_epochs, num_classes
         )
 
         # Store training and validation losses for this fold
         train_losses_total.append(train_losses)
         val_losses_total.append(val_losses)
+        best_epoch_total.append(best_epoch)
 
         # Evaluate on the validation set for this fold
+        logger.info("Performing validation predictions")
         model.eval()
         predictions = predict_mlp(model, val_loader, device, num_classes).cpu().numpy()
         predictions = predictions.round().astype(int)
@@ -235,8 +238,8 @@ if __name__ == '__main__':
     logger.info("K-Fold Cross-Validation Completed")
 
     # Plot training and validation loss graphs
-    plot_loss(train_losses_total, loss_graph_path, suffix_name, "Train")
-    plot_loss(val_losses_total, loss_graph_path, suffix_name, "Validation")
+    plot_loss(train_losses_total, loss_graph_path, suffix_name, "Train", best_epoch_total)
+    plot_loss(val_losses_total, loss_graph_path, suffix_name, "Validation", best_epoch_total)
 
     # Evaluation on the test set using the model from the last fold
     logger.info("Evaluating on final test set")

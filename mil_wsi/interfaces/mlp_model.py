@@ -148,7 +148,7 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
         os.remove(save_path)
         logger.info(f"Removed checkpoint file: {save_path}")
 
-    return model, train_losses, val_losses
+    return model, train_losses, val_losses,best_epoch
 
 
 

@@ -8,7 +8,7 @@ models_path: "./mil_wsi/models/"
 # Main
 data_name: 'hobi'
 experiment_name: 'uni'
-experiment_number: '1'
+experiment_number: '2'
 
 create_patches:
   patch_size: 256
