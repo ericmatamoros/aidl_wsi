@@ -56,8 +56,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MLP model')
     parser.add_argument('--dir_results', type=str, help='Path to folder containing the results')
     parser.add_argument('--dir_data', type=str, help='Path containing slides')
-    parser.add_argument('--experiment_name', type = str,
-					help='name of the experiment')
+    parser.add_argument('--data_name', type = str, help='Name of the subfolder for the data')
+    parser.add_argument('--experiment_name', type = str, help='Name of the subfolder for the data')
+    parser.add_argument('--experiment_number', type = str, default=1, help='Number/word to diferentiate diferent experiments with the same conditions')
     parser.add_argument('--dir_model', type=str, help='Path to store the trained models')
     parser.add_argument('--dir_metrics', type=str, help='Path to store metrics')
     parser.add_argument('--model_name', type=str, default='mlp_model', help='Name of the model')
@@ -70,20 +71,20 @@ if __name__ == '__main__':
     parser.add_argument('--test_size', type=float, default=0.2, help='Test size')
     parser.add_argument('--k_folds', type=int, default=4, help='Number of train-test splits to perform')
     parser.add_argument('--dimentions', type=int, help='Numer of latent spaces')
-
+    
 
     args = parser.parse_args()
 
     # Define directories and create them if they don't exist
-    input_path = f"{args.dir_results}/{args.experiment_name}/"
-    data_path = f"{args.dir_data}{args.experiment_name}"
-    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_dim{args.dimentions}"
+    input_path = f"{args.dir_results}/{args.experiment_name}/" # files where are located the results of the feature extraction
+    data_path = f"{args.dir_data}{args.data_name}" # Directory where the WSI are stored
+    suffix_name = f"MLP_bs{args.batch_size}_hs{args.hidden_size}_ep{args.epochs}_ts{args.test_size}_kf{args.k_folds}_lr{args.learning_rate}_dim{args.dimentions}_exp{args.experiment_number}"
     model_path = f"{args.dir_model}mlp/{args.experiment_name}/{suffix_name}"
     metrics_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}"
     loss_graph_path = f"{args.dir_metrics}/{args.experiment_name}/{suffix_name}/losses_graphs"
 
-    os.makedirs(input_path, exist_ok=True)
-    os.makedirs(data_path, exist_ok=True)
+    #os.makedirs(input_path, exist_ok=True)
+    #os.makedirs(data_path, exist_ok=True)
     os.makedirs(model_path, exist_ok=True)
     os.makedirs(metrics_path, exist_ok=True)
     os.makedirs(loss_graph_path, exist_ok=True)
@@ -92,9 +93,17 @@ if __name__ == '__main__':
     predictions_name = f"{args.predictions_name}{suffix_name}"
     metrics_name = f"{args.metrics_name}{suffix_name}"
 
+
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Error: Data path '{data_path}' doesn't exist ")
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Error: pt_files path '{input_path}' doesn't exist ")
+    
+    logger.info(f"Data path (WSI): {data_path}")
+    logger.info(f"pt_files path: {input_path}")
+    
     files_pt = os.listdir(f"{input_path}/pt_files")
 
-    logger.info(data_path)
 
     logger.info("Reading data and generating data loaders")
     # Read target CSV file
@@ -111,7 +120,6 @@ if __name__ == '__main__':
     df = load_data(input_path, files_pt, target)
 
     # Separate features and target
-    #breakpoint()
     features = df.iloc[:, 0:args.dimentions]
     input_size = features.shape[1]
     target = df['target']
@@ -191,15 +199,15 @@ if __name__ == '__main__':
 
         # Calculate and store metrics for this fold
         fold_metrics = compute_metrics(predictions, y_val_fold, num_classes)
-        logger.info(fold_metrics)
+        #logger.info(fold_metrics)
         all_metrics.append(fold_metrics)
 
         # Suponiendo que quieres optimizar el F1-score (ajusta según tu criterio)
         val_metric = fold_metrics.get('f1', 0)  # O usa otra métrica relevante
-        logger.info(val_metric)
+        #logger.info(val_metric)
         logger.info(f"Fold {fold + 1} - F1 Score: {val_metric}")
 
-        logger.info(model_path)
+        #logger.info(model_path)
 
         logger.info(f"val_metric: {val_metric} and best_val_metric: {best_val_metric}")
         # GUARDAR EL MEJOR MODELO
@@ -211,7 +219,8 @@ if __name__ == '__main__':
 
 
 
-        
+    logger.info(f"Final model saved at: {best_model_path}")    
+    
     # Average validation metrics across folds
     final_metrics = {
         key: {"mean": np.mean([m[key] for m in all_metrics]), "std": np.std([m[key] for m in all_metrics])}

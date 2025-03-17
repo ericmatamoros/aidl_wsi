@@ -6,7 +6,9 @@ metrics_path: "./mil_wsi/metrics/"
 models_path: "./mil_wsi/models/"
 
 # Main
-experiment_name: 'normal'
+data_name: 'hobi'
+experiment_name: 'uni'
+experiment_number: '1'
 
 create_patches:
   patch_size: 256

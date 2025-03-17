@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-def plot_loss(loss_list, output_dir, suffix_name, training_type):
+def plot_loss(loss_list, output_dir, suffix_name, training_type, best_epoch):
     """
     Generates and saves loss plots per epoch:
     
@@ -51,7 +51,9 @@ def plot_loss(loss_list, output_dir, suffix_name, training_type):
     plt.figure(figsize=(8, 6))
     max_loss = 0
     for i, fold_loss in enumerate(loss_array):
-        plt.plot(range(1, len(fold_loss) + 1), fold_loss, marker='o', linestyle='-', label=f"Fold {i+1}")
+        line, = plt.plot(range(1, len(fold_loss) + 1), fold_loss, marker='o', linestyle='-', label=f"Fold {i+1}")
+        line_color = line.get_color()
+        plt.axvline(x = best_epoch[i], linestyle='--', color = line_color, alpha = 0.5)
         if np.max(fold_loss) > max_loss:
             max_loss = np.max(fold_loss)
 
