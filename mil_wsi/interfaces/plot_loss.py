@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+from loguru import logger
+
 def plot_loss(loss_list, output_dir, suffix_name, training_type, best_epoch):
     """
     Generates and saves loss plots per epoch:
@@ -34,7 +36,7 @@ def plot_loss(loss_list, output_dir, suffix_name, training_type, best_epoch):
         loss_array = np.array([loss_list])  # Convert to a single-dimension array if not using K-Fold
         mean_loss = loss_list
 
-    # 1️. **Plot of the Mean Loss**
+    # 1️. Plot of the Mean Loss
     plt.figure(figsize=(8, 6))
     plt.plot(range(1, len(mean_loss) + 1), mean_loss, marker='o', linestyle='-', label="Mean Loss", color='black')
     plt.xlabel("Epoch")
@@ -44,10 +46,9 @@ def plot_loss(loss_list, output_dir, suffix_name, training_type, best_epoch):
     plt.ylim(np.min(mean_loss)-0.2, np.max(mean_loss)+0.2)
     plt.grid(True)
     output_path_mean = os.path.join(output_dir, f"{training_type}_{suffix_name}_loss_plot_mean.png")
-    plt.savefig(output_path_mean)  # Save the plot
-    # plt.show()
+    plt.savefig(output_path_mean)
 
-    # 2️. **Plot of Loss for Each Fold**
+    # 2️. Plot of Loss for Each Fold
     plt.figure(figsize=(8, 6))
     max_loss = 0
     for i, fold_loss in enumerate(loss_array):
@@ -65,6 +66,5 @@ def plot_loss(loss_list, output_dir, suffix_name, training_type, best_epoch):
     plt.grid(True)
     output_path_folds = os.path.join(output_dir, f"{training_type}_{suffix_name}_loss_plot_folds.png")
     plt.savefig(output_path_folds)  # Save the plot
-    # plt.show()
 
-    print(f"Loss plots saved to {output_path_mean} and {output_path_folds}")
+    logger.info(f"Loss plots saved to {output_path_mean} and {output_path_folds}")

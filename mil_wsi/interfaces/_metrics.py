@@ -2,6 +2,22 @@ import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 
 def compute_metrics(y_pred, y_true, num_classes):
+    """
+    Computes classification metrics including precision, recall, F1 score, 
+    and the confusion matrix for binary and multi-class classification.
+
+    Args:
+        y_pred (array-like): Predicted class labels.
+        y_true (array-like): Ground-truth class labels.
+        num_classes (int): Number of classes in the classification task.
+
+    Returns:
+        dict: A dictionary containing the following metrics:
+            - 'precision' (float): Precision score.
+            - 'recall' (float): Recall score.
+            - 'f1' (float): F1 score.
+            - 'confusion_matrix' (pd.DataFrame): Confusion matrix as a DataFrame.
+    """
     if num_classes == 2:
         # Calculate precision, recall, and F1 score
         precision = precision_score(y_true, y_pred, pos_label=1)

@@ -33,9 +33,9 @@ class MILBagDataset(Dataset):
 
         for file in files_pt:
             basename = file.split(".pt")[0]
-            data = torch.load(f"{input_path}/pt_files/{file}")  # Shape: (N_instances, D_features)
+            data = torch.load(f"{input_path}/pt_files/{file}") 
             
-            if data.ndim == 1:  # Ensure 2D structure
+            if data.ndim == 1:
                 data = data.unsqueeze(0)
             
             label = target.loc[target['filename'] == basename, 'target'].values
@@ -67,5 +67,5 @@ class MILBagDataset(Dataset):
             int/float: Label associated with the bag.
             str: Filename of the bag.
         """
-        return self.bags[idx], self.labels[idx], self.filenames[idx]  # Return basename
+        return self.bags[idx], self.labels[idx], self.filenames[idx]
 

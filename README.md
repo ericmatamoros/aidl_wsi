@@ -302,11 +302,34 @@ The primary users of this project are histopathology experts who can utilize thi
 Streamlit is an open-source Python library that makes it easy to create interactive web applications that can be deployed either in the local machine (through a specific port) or opened to internet throughStreamlit Cloud, AWS or any other host provider. We have only explored the local deployment solution but aim to work on a cloud-based host in the future.
 
 # Experiment results
+Experiments performed aim to evaluate the different architectures on being able to classify whether a patient has cancer or not (SNL dataset used for binary classification) and add complexity into being able to differentiate the tumour types (BRACS dataset with different forms of benign and malignant cancer conditions). Classic metrics have been used for evaluation: Precision (proportion of correctly predicted positive instances out of all instances predicted as positive.), recall (related with the proportion of true cases that are properly picked by the model) and F1 (harmonic balance between precision and recall)
 
-RESULTS
+The experiments contemplate 2 sources of variability: 1) The feature extraction (UNI or CONCH) and 2) The bag encoders user (mean aggregation, gated attention or transformer), totalling in 6 experiments from these combinations:
+
+![Experiment proposal](images/experiment_proposal.png)
+
+
+## Binary classification Problem:  SNL-Breast dataset
+This dataset contains 2 classes: Positive Metastatic Breast Carcinoma (92 WSI) and Negative Metastatic Breast Carcinoma (34 WSI).
+
+The gated attention mechanism clearly outperforms the others no matter what methodology is being used as feature extraction
+![Experiment 1 gated](images/experiment_binary_gated.png)
+![Experiment 1 mean](images/experiment_binary_mean.png)
+![Experiment 1 transformer](images/experiment_binary_transformer.png)
+
+## Multiple classification Problem: BRACS dataset
+This dataset contains 7 different classes and a total size of 1TB in data. Due to storage limitations we have filtered out to a smaller subset of images with the following configuration: 1) 21 WSI Normal; 2) 40 WSI Pathological Bening; 3) 18 WSI usual Ductal Hyperplasia, 4) 22 WSI Ductal Carcinoma In Situ; 5) 48 Invasive Carcinoma. It totals 79 WSI of Beningn conditions (1 to 3) and 70 WSI of malignant tumors (4-5).
+
+![Experiment 2 gated](images/experiment_multi_gated.png)
+![Experiment 2 mean](images/experiment_multi_mean.png)
+![Experiment 2 transformer](images/experiment_multi_transformer.png)
+
+Gated attention appears to outperform transformer and mean agg pooling no matter the feature extraction method used
+
 
 # Streamlit application in action
 Below you can find a video showcasing the **Streamlit application** performing real-time inference of a given WSI, where it's generating the whole image segmentation, masking, feature extraction, prediction of the class and heatmap generation in real time:
+
 
 **Click on the image** to load the Youtube video:
 [![Streamlit MIL for WSI classification with Post-Hoc Explainability Maps](./images/streamlit.png)](https://www.youtube.com/watch?v=4ZEaZEFkQZM)

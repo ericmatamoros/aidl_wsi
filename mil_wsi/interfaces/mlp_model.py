@@ -93,13 +93,10 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-            #breakpoint()
             if num_classes == 2:
-                #loss = criterion(outputs.view(-1), labels.float())  # Binary
-                focal_loss = FocalLoss()
-                loss = focal_loss(outputs.view(-1), labels.float())
+                loss = criterion(outputs.view(-1), labels.float())
             else:
-                loss = criterion(outputs, labels.long())  # Multiclass
+                loss = criterion(outputs, labels.long())
 
             loss.backward()
             optimizer.step()
@@ -118,9 +115,9 @@ def train_mlp(model, train_loader, val_loader, optimizer, device, epochs, num_cl
                 outputs = model(inputs)
 
                 if num_classes == 2:
-                    loss = criterion(outputs.view(-1), labels.float())  # Binary .squeeze()
+                    loss = criterion(outputs.view(-1), labels.float())
                 else:
-                    loss = criterion(outputs, labels.long())  # Multiclass
+                    loss = criterion(outputs, labels.long())
 
                 val_loss += loss.item()
         
@@ -176,11 +173,10 @@ def predict_mlp(model, test_loader, device: torch.device, num_classes: int, thre
             outputs = model(inputs)
 
             if num_classes == 2:
-                probs = torch.sigmoid(outputs)  # Binary classification
-                #threshold = probs.mean().item() 
+                probs = torch.sigmoid(outputs)
                 preds = (probs > threshold).float()
             else:
-                preds = torch.argmax(F.softmax(outputs, dim=1), dim=1)  # Multiclass classification
+                preds = torch.argmax(F.softmax(outputs, dim=1), dim=1)
             
             all_preds.append(preds)
 
