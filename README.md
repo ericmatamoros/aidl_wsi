@@ -255,7 +255,7 @@ Some common parameters are shared across the models
 - **`epochs`** (`--epochs`):  Defines the number of times the entire training dataset is passed through the model.
 
 
-### **1. Mean aggregation with MLP**: 
+### **1. Mean aggregation**: 
 The final Whole Slide Image (WSI) representation is obtained by calculating the arithmetic mean of the representations across all patches with a final Multi-Layer Perceptron (MLP) to predict the label category. This methodology will be used as a benchmark model for its simplicity to average the patches into a single representation.
 
 ![Mean Agg](images/mean_agg_formula.png)
