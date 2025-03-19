@@ -127,9 +127,9 @@ class AttentionMILMLP(nn.Module):
         super(AttentionMILMLP, self).__init__()
         
         if attention_class == "AttentionMIL":
-            self.attention_mil = AttentionMIL(input_size, hidden_size)  # Instancia de atención
+            self.attention_mil = AttentionMIL(input_size, hidden_size)
         elif attention_class == "MultiHeadAttention":
-            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)  # Instancia de atención
+            self.attention_mil = MultiHeadAttention(input_size, hidden_size, n_heads)
         else:
             raise Exception("Not a valid attention mechanism")
         
@@ -151,7 +151,7 @@ class AttentionMILMLP(nn.Module):
             torch.Tensor: Attention weights assigned to instances within each bag.
         """
         bag_representation, attn_weights = self.attention_mil(x)
-        output = self.classifier(bag_representation)  # Pasa por MLP externa
+        output = self.classifier(bag_representation)
         return output, attn_weights
 
 def train_attention_mil(

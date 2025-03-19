@@ -3,9 +3,6 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
-from loguru import logger
-
-
 class MLPDataset(Dataset):
     """
     Custom dataset class for training an MLP model.
